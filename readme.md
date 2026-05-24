@@ -2,6 +2,8 @@
 
 A rich, performant TUI library for Rust.
 
+https://github.com/user-attachments/assets/ec1d8d8d-e476-4b78-8404-dd234d5a2ec7
+
 ### Features
 
 - **Layout:** Flexbox, grids, splits, and virtualized lists, all with min, max, and preferred-size constraints.
