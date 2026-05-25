@@ -452,6 +452,12 @@ pub fn hide_cursor(out: &mut String) {
     out.push_str("\x1b[?25l");
 }
 
+/// Resets the cursor style to the terminal default (DECSCUSR, `CSI 0 SP q`).
+#[inline]
+pub fn reset_cursor_style(out: &mut String) {
+    out.push_str("\x1b[0 q");
+}
+
 /// Sets the cursor style (DECSCUSR, `CSI n SP q`) from a [`CursorShape`] and blink flag.
 #[inline]
 pub fn set_cursor_style(out: &mut String, shape: CursorShape, blink: bool) {

@@ -1276,6 +1276,8 @@ impl Runtime {
                     #[cfg(feature = "harmonious")]
                     crate::theme::harmonious::clear_palette();
                     let mut buf = String::new();
+                    output::reset_cursor_style(&mut buf);
+                    output::show_cursor(&mut buf);
                     output::leave_alternate_screen(&mut buf);
                     output::pop_keyboard_enhancement_flags(&mut buf);
                     output::disable_mouse_pixel_capture(&mut buf);
@@ -1491,6 +1493,9 @@ impl Runtime {
         output::end_synchronized_update(&mut self.buf);
         #[cfg(feature = "harmonious")]
         crate::theme::harmonious::clear_palette();
+        output::reset_cursor_style(&mut self.buf);
+        output::show_cursor(&mut self.buf);
+        self.cursor_visible = true;
         output::leave_alternate_screen(&mut self.buf);
         output::pop_keyboard_enhancement_flags(&mut self.buf);
         let pixel_mouse = RUNTIME_CTX
