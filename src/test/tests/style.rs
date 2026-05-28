@@ -315,6 +315,36 @@ fn parse_line_style_inside_underline_errors() {
 }
 
 #[test]
+fn parse_no_writes_explicit_false() {
+    let s = parse("bold-red-no-bold");
+    assert_eq!(s.fg, Some(Color::RED));
+    assert!(!s.has_bold());
+    assert!(s.get_attrs_mask() & (StyleAttribute::Bold as u8) != 0);
+    assert_eq!(parse("no-underline").underline, Some(UnderlineType::None));
+}
+
+#[test]
+fn parse_no_unknown_target_errors() {
+    parse_err("no-red");
+    parse_err("no");
+}
+
+#[test]
+fn parse_plain_writes_concrete_defaults() {
+    let s = parse("plain-red");
+    assert_eq!(s.fg, Some(Color::RED));
+    assert_eq!(s.bg, Some(Color::Background));
+    assert_eq!(s.underline, Some(UnderlineType::None));
+    let all_attrs = (StyleAttribute::Bold as u8)
+        | (StyleAttribute::Italic as u8)
+        | (StyleAttribute::Dim as u8)
+        | (StyleAttribute::Strikethrough as u8)
+        | (StyleAttribute::Reverse as u8);
+    assert_eq!(s.get_attrs_mask(), all_attrs);
+    assert!(!s.has_bold());
+}
+
+#[test]
 fn styled_string_push_str_default_style() {
     let mut s = StyledString::new();
     s.push_str("hi");

@@ -70,6 +70,23 @@ impl Style {
         }
     }
 
+    /// Style with every field explicitly written to its terminal default.
+    pub const fn plain() -> Self {
+        Self {
+            fg: Some(Color::Foreground),
+            bg: Some(Color::Background),
+            underline_color: None,
+            underline: Some(UnderlineType::None),
+            attrs: 0,
+            mask: (StyleAttribute::Bold as u8)
+                | (StyleAttribute::Italic as u8)
+                | (StyleAttribute::Reverse as u8)
+                | (StyleAttribute::Strikethrough as u8)
+                | (StyleAttribute::Dim as u8),
+            blend: None,
+        }
+    }
+
     /// Returns `true` if no fields are set (equivalent to [`Style::new`]).
     pub const fn is_empty(&self) -> bool {
         self.fg.is_none()
@@ -910,6 +927,24 @@ impl std::str::FromStr for Style {
                 "dashed" => parse_ul(&mut iter, UnderlineType::Dashed, &mut s)?,
                 "underline" => s.underline = Some(UnderlineType::Single),
                 "on" => parse_bg(&mut iter, &mut s)?,
+                "no" => {
+                    let next = iter.next()
+                        .ok_or("'no' expected an attribute")?;
+                    match next {
+                        "bold" => s.set_bold(false),
+                        "italic" => s.set_italic(false),
+                        "dim" => s.set_dim(false),
+                        "strikethrough" => s.set_strikethrough(false),
+                        "reverse" => s.set_reverse(false),
+                        "underline" => {
+                            s.underline = Some(UnderlineType::None);
+                            s.underline_color = None;
+                        },
+                        _ => return Err(format!(
+                            "'no' expected an attribute, got '{next}'").into())
+                    }
+                }
+                "plain" => s = Style::plain(),
                 _ => s.fg = Some(parse_color(&mut iter, token)?),
             }
         }
