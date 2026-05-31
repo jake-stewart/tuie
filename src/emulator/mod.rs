@@ -1,17 +1,14 @@
 //! Test harness for driving widgets through the runtime.
 
-#[cfg(test)]
-mod tests;
-
 use crate::prelude::*;
 
 /// Drives a widget tree through the runtime and captures the rendered output.
-pub struct TestTerminal(());
+pub struct Emulator(());
 
-impl TestTerminal {
-    /// Creates a [`TestTerminal`] with `root` rendered at `size`.
+impl Emulator {
+    /// Creates a [`Emulator`] with `root` rendered at `size`.
     pub fn new(root: &mut dyn Widget, size: Vec2<u16>) -> Self {
-        crate::runtime::test_init(size);
+        crate::runtime::init_emulator(size);
         let _ = crate::runtime::update(root, &[RuntimeEvent::Resize(size)]);
         Self(())
     }
@@ -23,7 +20,7 @@ impl TestTerminal {
 
     /// Returns the most recently rendered frame as a [`StyledString`].
     pub fn get_snapshot(&self) -> StyledString {
-        crate::runtime::get_snapshot()
+        crate::runtime::get_emulator_snapshot()
     }
 
     /// Returns the most recently rendered frame as plain text.

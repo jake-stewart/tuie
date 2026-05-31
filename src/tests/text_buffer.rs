@@ -1,7 +1,7 @@
 //! Tests for the text buffer, cursor, layout, and document traits.
 
 use tuie::prelude::*;
-use tuie::test::TestTerminal;
+use tuie::emulator::Emulator;
 
 fn make_text(s: &str) -> Box<Text> {
     Text::new().content(s)
@@ -381,7 +381,7 @@ fn move_document_end_directional() {
 #[test]
 fn layout_index_to_pos_maps_single_line() {
     let mut t = make_text("hello");
-    let _term = TestTerminal::new(&mut *t, Vec2::new(10, 1));
+    let _term = Emulator::new(&mut *t, Vec2::new(10, 1));
     assert_eq!(t.index_to_virtual_pos(0, Sign::Positive), Vec2::new(0, 0));
     assert_eq!(t.index_to_virtual_pos(3, Sign::Positive), Vec2::new(3, 0));
     assert_eq!(t.index_to_virtual_pos(5, Sign::Positive), Vec2::new(5, 0));
@@ -390,7 +390,7 @@ fn layout_index_to_pos_maps_single_line() {
 #[test]
 fn layout_index_to_pos_maps_multiple_lines() {
     let mut t = make_text("ab\ncd");
-    let _term = TestTerminal::new(&mut *t, Vec2::new(5, 2));
+    let _term = Emulator::new(&mut *t, Vec2::new(5, 2));
     assert_eq!(t.index_to_virtual_pos(0, Sign::Positive), Vec2::new(0, 0));
     assert_eq!(t.index_to_virtual_pos(2, Sign::Positive), Vec2::new(2, 0));
     assert_eq!(t.index_to_virtual_pos(3, Sign::Positive), Vec2::new(0, 1));
@@ -400,7 +400,7 @@ fn layout_index_to_pos_maps_multiple_lines() {
 #[test]
 fn layout_pos_to_index_round_trips() {
     let mut t = make_text("hello\nworld");
-    let _term = TestTerminal::new(&mut *t, Vec2::new(10, 2));
+    let _term = Emulator::new(&mut *t, Vec2::new(10, 2));
     for i in 0..=t.len() {
         let pos = t.index_to_virtual_pos(i, Sign::Negative);
         let back = t.pos_to_index(pos);
@@ -411,7 +411,7 @@ fn layout_pos_to_index_round_trips() {
 #[test]
 fn layout_get_visible_size_matches_terminal_size() {
     let mut t = make_text("hi");
-    let _term = TestTerminal::new(&mut *t, Vec2::new(20, 5));
+    let _term = Emulator::new(&mut *t, Vec2::new(20, 5));
     let size = TextLayout::get_visible_size(&*t);
     assert_eq!(size, Vec2::new(20, 5));
 }

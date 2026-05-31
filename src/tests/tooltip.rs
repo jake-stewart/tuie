@@ -1,7 +1,7 @@
 //! Integration tests for tooltip rendering.
 
 use tuie::prelude::*;
-use tuie::test::TestTerminal;
+use tuie::emulator::Emulator;
 
 fn anchor_text(s: &str) -> Box<Text> {
     Text::new().content(s.to_string()).width(s.chars().count() as u16).height(1)
@@ -19,7 +19,7 @@ fn hidden_by_default_renders_only_anchor() {
                 .content(body_pane("BODY")),
         ]),
     );
-    let term = TestTerminal::new(&mut *root, Vec2::new(8, 3));
+    let term = Emulator::new(&mut *root, Vec2::new(8, 3));
     term.assert_lines([
         "AA      ",
         "        ",
@@ -37,7 +37,7 @@ fn visible_builder_shows_body() {
                 .visible(),
         ]),
     );
-    let term = TestTerminal::new(&mut *root, Vec2::new(8, 4));
+    let term = Emulator::new(&mut *root, Vec2::new(8, 4));
     let snap = term.get_snapshot_text();
     assert!(snap.contains("AA"), "anchor present: {snap:?}");
     assert!(snap.contains("BODY"), "body present: {snap:?}");
@@ -52,7 +52,7 @@ fn set_visible_toggles_body() {
     let tooltip_id = tooltip.get_id();
 
     let mut root = Stack::new(Pane::new().children([tooltip]));
-    let mut term = TestTerminal::new(&mut *root, Vec2::new(8, 4));
+    let mut term = Emulator::new(&mut *root, Vec2::new(8, 4));
 
     assert!(!term.get_snapshot_text().contains("HI"));
 
@@ -79,7 +79,7 @@ fn placement_below_anchor() {
                 .visible(),
         ]),
     );
-    let term = TestTerminal::new(&mut *root, Vec2::new(8, 5));
+    let term = Emulator::new(&mut *root, Vec2::new(8, 5));
     term.assert_lines([
         "AA      ",
         "┌─┐     ",
@@ -99,7 +99,7 @@ fn placement_above_anchor() {
                 .visible(),
         ]),
     );
-    let term = TestTerminal::new(&mut *root, Vec2::new(8, 5));
+    let term = Emulator::new(&mut *root, Vec2::new(8, 5));
     term.assert_lines([
         "┌─┐     ",
         "│X│     ",
@@ -119,7 +119,7 @@ fn placement_right_of_anchor() {
                 .visible(),
         ]),
     );
-    let term = TestTerminal::new(&mut *root, Vec2::new(8, 3));
+    let term = Emulator::new(&mut *root, Vec2::new(8, 3));
     term.assert_lines([
         "AA┌─┐   ",
         "  │X│   ",
@@ -137,7 +137,7 @@ fn placement_left_of_anchor() {
                 .visible(),
         ]),
     );
-    let term = TestTerminal::new(&mut *root, Vec2::new(8, 3));
+    let term = Emulator::new(&mut *root, Vec2::new(8, 3));
     term.assert_lines([
         " ┌─┐AA  ",
         " │X│    ",
@@ -157,7 +157,7 @@ fn body_with_offset_placement() {
                 .visible(),
         ]),
     );
-    let term = TestTerminal::new(&mut *root, Vec2::new(8, 5));
+    let term = Emulator::new(&mut *root, Vec2::new(8, 5));
     term.assert_lines([
         "AA      ",
         "  ┌─┐   ",
@@ -181,7 +181,7 @@ fn body_renders_over_other_content() {
                 .visible(),
         ]),
     ]);
-    let term = TestTerminal::new(&mut *root, Vec2::new(8, 4));
+    let term = Emulator::new(&mut *root, Vec2::new(8, 4));
     term.assert_lines([
         "AA......",
         "┌──┐    ",
@@ -205,7 +205,7 @@ fn multiline_body_content() {
                 .visible(),
         ]),
     );
-    let term = TestTerminal::new(&mut *root, Vec2::new(9, 5));
+    let term = Emulator::new(&mut *root, Vec2::new(9, 5));
     term.assert_lines([
         "AA       ",
         "┌─────┐  ",
@@ -220,7 +220,7 @@ fn anchor_visible_without_body() {
     let mut root = Stack::new(
         Pane::new().children([Tooltip::new(anchor_text("HELLO"))]),
     );
-    let term = TestTerminal::new(&mut *root, Vec2::new(8, 2));
+    let term = Emulator::new(&mut *root, Vec2::new(8, 2));
     term.assert_lines([
         "HELLO   ",
         "        ",

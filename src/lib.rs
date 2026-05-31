@@ -7,15 +7,18 @@ pub use paste;
 
 pub mod ansi;
 pub mod editor;
+pub mod emulator;
 #[cfg(feature = "gui")]
 pub mod gui;
 pub mod input;
 pub mod render;
 pub mod runtime;
-pub mod test;
 pub mod theme;
 pub mod util;
 pub mod widget;
+
+#[cfg(test)]
+mod tests;
 
 #[doc(hidden)]
 pub use runtime::{

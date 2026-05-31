@@ -1073,7 +1073,7 @@ fn run_terminal(root: &mut dyn Widget) -> std::io::Result<u8> {
 }
 
 /// Resets the runtime to a clean state for an in-process test at `size`.
-pub fn test_init(size: Vec2<u16>) {
+pub fn init_emulator(size: Vec2<u16>) {
     RUNTIME.with_borrow_mut(|rt| *rt = Runtime::new());
     with_ctx_mut(|ctx| *ctx = RuntimeContext::new());
     with_runtime_mut(|rt| {
@@ -1093,7 +1093,7 @@ pub fn test_init(size: Vec2<u16>) {
 }
 
 /// Returns the most recently rendered frame as a [`crate::render::style::StyledString`] snapshot.
-pub fn get_snapshot() -> crate::render::style::StyledString {
+pub fn get_emulator_snapshot() -> crate::render::style::StyledString {
     with_runtime_mut(|rt| rt.renderer.get_snapshot())
 }
 

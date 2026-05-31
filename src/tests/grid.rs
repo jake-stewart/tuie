@@ -2,7 +2,7 @@
 
 use chord_macro::chord;
 use tuie::prelude::*;
-use tuie::test::TestTerminal;
+use tuie::emulator::Emulator;
 
 fn cell_text(s: &'static str) -> Box<dyn Widget> {
     Text::new().content(s) as Box<dyn Widget>
@@ -48,7 +48,7 @@ fn color_grid(
 #[test]
 fn empty_grid_renders_blank() {
     let mut root = Grid::new();
-    let term = TestTerminal::new(&mut *root, Vec2::new(4, 2));
+    let term = Emulator::new(&mut *root, Vec2::new(4, 2));
     term.assert_lines([
         "    ",
         "    ",
@@ -61,7 +61,7 @@ fn single_cell_single_track_fills_area() {
         .columns([Track::grow(1)])
         .rows([Track::grow(1)])
         .child(0, 0, cell_text("hi"));
-    let term = TestTerminal::new(&mut *root, Vec2::new(4, 2));
+    let term = Emulator::new(&mut *root, Vec2::new(4, 2));
     term.assert_lines([
         "hi  ",
         "    ",
@@ -75,7 +75,7 @@ fn two_fixed_columns_size_to_basis() {
         .rows([Track::grow(1)])
         .child(0, 0, cell_text("AAA"))
         .child(0, 1, cell_text("BBBBB"));
-    let term = TestTerminal::new(&mut *root, Vec2::new(10, 1));
+    let term = Emulator::new(&mut *root, Vec2::new(10, 1));
     term.assert_lines([
         "AAABBBBB  ",
     ]);
@@ -88,7 +88,7 @@ fn two_equal_flex_columns_split_evenly() {
         .rows([Track::grow(1)])
         .child(0, 0, cell_text("L"))
         .child(0, 1, cell_text("R"));
-    let term = TestTerminal::new(&mut *root, Vec2::new(6, 1));
+    let term = Emulator::new(&mut *root, Vec2::new(6, 1));
     term.assert_lines([
         "L  R  ",
     ]);
@@ -101,7 +101,7 @@ fn flex_weights_distribute_proportionally() {
         .rows([Track::grow(1)])
         .child(0, 0, cell_text("a"))
         .child(0, 1, cell_text("b"));
-    let term = TestTerminal::new(&mut *root, Vec2::new(8, 1));
+    let term = Emulator::new(&mut *root, Vec2::new(8, 1));
     term.assert_lines([
         "a  b    ",
     ]);
@@ -114,7 +114,7 @@ fn fixed_plus_flex_column() {
         .rows([Track::grow(1)])
         .child(0, 0, cell_text("XX"))
         .child(0, 1, cell_text("YYYY"));
-    let term = TestTerminal::new(&mut *root, Vec2::new(6, 1));
+    let term = Emulator::new(&mut *root, Vec2::new(6, 1));
     term.assert_lines([
         "XXYYYY",
     ]);
@@ -127,7 +127,7 @@ fn two_fixed_rows_size_to_basis() {
         .rows([Track::fixed(1), Track::fixed(2)])
         .child(0, 0, cell_text("top"))
         .child(1, 0, cell_text("bot"));
-    let term = TestTerminal::new(&mut *root, Vec2::new(4, 4));
+    let term = Emulator::new(&mut *root, Vec2::new(4, 4));
     term.assert_lines([
         "top ",
         "bot ",
@@ -144,7 +144,7 @@ fn col_gap_inserts_space_between_columns() {
         .col_gap(2)
         .child(0, 0, cell_text("A"))
         .child(0, 1, cell_text("B"));
-    let term = TestTerminal::new(&mut *root, Vec2::new(8, 1));
+    let term = Emulator::new(&mut *root, Vec2::new(8, 1));
     term.assert_lines([
         "A    B  ",
     ]);
@@ -158,7 +158,7 @@ fn row_gap_inserts_blank_row_between_rows() {
         .row_gap(1)
         .child(0, 0, cell_text("up"))
         .child(1, 0, cell_text("dn"));
-    let term = TestTerminal::new(&mut *root, Vec2::new(3, 3));
+    let term = Emulator::new(&mut *root, Vec2::new(3, 3));
     term.assert_lines([
         "up ",
         "   ",
@@ -172,7 +172,7 @@ fn col_span_widens_cell_across_columns() {
         .columns([Track::grow(1), Track::grow(1), Track::grow(1)])
         .rows([Track::grow(1)])
         .cell(Cell::new(0, 0, cell_text("HEADER")).span(1, 3));
-    let term = TestTerminal::new(&mut *root, Vec2::new(9, 1));
+    let term = Emulator::new(&mut *root, Vec2::new(9, 1));
     term.assert_lines([
         "HEADER   ",
     ]);
@@ -184,7 +184,7 @@ fn row_span_extends_cell_across_rows() {
         .columns([Track::grow(1)])
         .rows([Track::fixed(1), Track::fixed(1), Track::fixed(1)])
         .cell(Cell::new(0, 0, cell_text("S")).span(3, 1));
-    let term = TestTerminal::new(&mut *root, Vec2::new(2, 3));
+    let term = Emulator::new(&mut *root, Vec2::new(2, 3));
     term.assert_lines([
         "S ",
         "  ",
@@ -199,7 +199,7 @@ fn col_span_includes_inner_gaps() {
         .rows([Track::grow(1)])
         .col_gap(1)
         .cell(Cell::new(0, 0, cell_text("ABCDEFGH")).span(1, 3));
-    let term = TestTerminal::new(&mut *root, Vec2::new(10, 1));
+    let term = Emulator::new(&mut *root, Vec2::new(10, 1));
     term.assert_lines([
         "ABCDEFGH  ",
     ]);
@@ -212,7 +212,7 @@ fn resize_redistributes_flex() {
         .rows([Track::grow(1)])
         .child(0, 0, cell_text("L"))
         .child(0, 1, cell_text("R"));
-    let mut term = TestTerminal::new(&mut *root, Vec2::new(4, 1));
+    let mut term = Emulator::new(&mut *root, Vec2::new(4, 1));
     term.assert_lines(["L R "]);
     term.update(&mut *root, &[RuntimeEvent::Resize(Vec2::new(8, 1))]);
     term.assert_lines(["L   R   "]);
@@ -225,7 +225,7 @@ fn resize_taller_redistributes_rows() {
         .rows([Track::grow(1), Track::grow(1)])
         .child(0, 0, cell_text("t"))
         .child(1, 0, cell_text("b"));
-    let mut term = TestTerminal::new(&mut *root, Vec2::new(2, 4));
+    let mut term = Emulator::new(&mut *root, Vec2::new(2, 4));
     term.assert_lines([
         "t ",
         "  ",
@@ -246,7 +246,7 @@ fn align_items_x_middle_centers_each_child_in_cell() {
         .rows([Track::grow(1)])
         .x_place(Place::Middle)
         .child(0, 0, cell_text("ab"));
-    let term = TestTerminal::new(&mut *root, Vec2::new(6, 1));
+    let term = Emulator::new(&mut *root, Vec2::new(6, 1));
     term.assert_lines([
         "  ab  ",
     ]);
@@ -259,7 +259,7 @@ fn align_items_x_end_right_aligns_child_in_cell() {
         .rows([Track::grow(1)])
         .x_place(Place::End)
         .child(0, 0, cell_text("xy"));
-    let term = TestTerminal::new(&mut *root, Vec2::new(6, 1));
+    let term = Emulator::new(&mut *root, Vec2::new(6, 1));
     term.assert_lines([
         "    xy",
     ]);
@@ -272,7 +272,7 @@ fn align_items_y_middle_centers_child_vertically() {
         .rows([Track::fixed(3)])
         .y_place(Place::Middle)
         .child(0, 0, cell_text("z"));
-    let term = TestTerminal::new(&mut *root, Vec2::new(2, 3));
+    let term = Emulator::new(&mut *root, Vec2::new(2, 3));
     term.assert_lines([
         "  ",
         "z ",
@@ -287,7 +287,7 @@ fn align_items_y_end_bottoms_child_in_cell() {
         .rows([Track::fixed(3)])
         .y_place(Place::End)
         .child(0, 0, cell_text("z"));
-    let term = TestTerminal::new(&mut *root, Vec2::new(2, 3));
+    let term = Emulator::new(&mut *root, Vec2::new(2, 3));
     term.assert_lines([
         "  ",
         "  ",
@@ -303,7 +303,7 @@ fn justify_content_x_apart_pushes_tracks_to_edges() {
         .x_place(Place::Apart)
         .child(0, 0, cell_text("AA"))
         .child(0, 1, cell_text("BB"));
-    let term = TestTerminal::new(&mut *root, Vec2::new(8, 1));
+    let term = Emulator::new(&mut *root, Vec2::new(8, 1));
     term.assert_lines([
         "AA    BB",
     ]);
@@ -317,7 +317,7 @@ fn justify_content_y_apart_separates_rows_vertically() {
         .y_place(Place::Apart)
         .child(0, 0, cell_text("T"))
         .child(1, 0, cell_text("B"));
-    let term = TestTerminal::new(&mut *root, Vec2::new(2, 4));
+    let term = Emulator::new(&mut *root, Vec2::new(2, 4));
     term.assert_lines([
         "T ",
         "  ",
@@ -333,7 +333,7 @@ fn add_child_after_creation_renders() {
         .rows([Track::grow(1)]);
     root.add_child(0, 0, cell_text("A"));
     root.add_child(0, 1, cell_text("B"));
-    let term = TestTerminal::new(&mut *root, Vec2::new(6, 1));
+    let term = Emulator::new(&mut *root, Vec2::new(6, 1));
     term.assert_lines(["A  B  "]);
 }
 
@@ -344,7 +344,7 @@ fn remove_at_drops_child_at_origin() {
         .rows([Track::grow(1)])
         .child(0, 0, cell_text("XX"))
         .child(0, 1, cell_text("YY"));
-    let mut term = TestTerminal::new(&mut *root, Vec2::new(6, 1));
+    let mut term = Emulator::new(&mut *root, Vec2::new(6, 1));
     term.assert_lines(["XX YY "]);
     let removed = root.remove_at(0, 0);
     assert!(removed.is_some());
@@ -371,7 +371,7 @@ fn remove_by_id_drops_correct_child() {
         .rows([Track::grow(1)])
         .child(0, 0, target as Box<dyn Widget>)
         .child(0, 1, cell_text("KEEP"));
-    let mut term = TestTerminal::new(&mut *root, Vec2::new(10, 1));
+    let mut term = Emulator::new(&mut *root, Vec2::new(10, 1));
     term.assert_lines(["GONE KEEP "]);
     let removed = root.remove(target_id);
     assert!(removed.is_some());
@@ -398,7 +398,7 @@ fn clear_removes_all_children() {
         .rows([Track::grow(1)])
         .child(0, 0, cell_text("A"))
         .child(0, 1, cell_text("B"));
-    let mut term = TestTerminal::new(&mut *root, Vec2::new(6, 1));
+    let mut term = Emulator::new(&mut *root, Vec2::new(6, 1));
     term.assert_lines(["A  B  "]);
     root.clear();
     term.update(&mut *root, &[RuntimeEvent::Resize(Vec2::new(6, 1))]);
@@ -412,7 +412,7 @@ fn set_columns_replaces_tracks() {
         .rows([Track::grow(1)])
         .child(0, 0, cell_text("a"))
         .child(0, 1, cell_text("b"));
-    let mut term = TestTerminal::new(&mut *root, Vec2::new(6, 1));
+    let mut term = Emulator::new(&mut *root, Vec2::new(6, 1));
     root.set_columns(vec![Track::grow(1), Track::grow(1)]);
     term.update(&mut *root, &[RuntimeEvent::Resize(Vec2::new(6, 1))]);
     term.assert_lines(["a  b  "]);
@@ -425,7 +425,7 @@ fn set_rows_replaces_tracks() {
         .rows([Track::grow(1)])
         .child(0, 0, cell_text("a"))
         .child(1, 0, cell_text("b"));
-    let mut term = TestTerminal::new(&mut *root, Vec2::new(2, 4));
+    let mut term = Emulator::new(&mut *root, Vec2::new(2, 4));
     root.set_rows(vec![Track::grow(1), Track::grow(1)]);
     term.update(&mut *root, &[RuntimeEvent::Resize(Vec2::new(2, 4))]);
     term.assert_lines([
@@ -447,7 +447,7 @@ fn descendant_at_pos_hits_correct_cell() {
         .rows([Track::grow(1)])
         .child(0, 0, a as Box<dyn Widget>)
         .child(0, 1, b as Box<dyn Widget>);
-    let _term = TestTerminal::new(&mut *root, Vec2::new(4, 1));
+    let _term = Emulator::new(&mut *root, Vec2::new(4, 1));
     let hit_left = root.descendant_at_pos(Vec2::new(0.0, 0.0), None);
     let hit_right = root.descendant_at_pos(Vec2::new(3.0, 0.0), None);
     assert_eq!(hit_left, Some(a_id.untyped()));
@@ -495,7 +495,7 @@ fn builder_chain_composes_full_grid() {
         .child(0, 1, cell_text("bb"))
         .child(1, 0, cell_text("c"))
         .child(1, 1, cell_text("dd"));
-    let term = TestTerminal::new(&mut *root, Vec2::new(8, 4));
+    let term = Emulator::new(&mut *root, Vec2::new(8, 4));
     term.assert_lines([
         "a  bb   ",
         "        ",
@@ -511,7 +511,7 @@ fn spans_cross_row_gap_correctly() {
         .rows([Track::fixed(1), Track::fixed(1)])
         .row_gap(1)
         .cell(Cell::new(0, 0, cell_text("X")).span(2, 1));
-    let term = TestTerminal::new(&mut *root, Vec2::new(2, 3));
+    let term = Emulator::new(&mut *root, Vec2::new(2, 3));
     term.assert_lines([
         "X ",
         "  ",
@@ -531,7 +531,7 @@ fn nested_grids_compose() {
         .rows([Track::fixed(1), Track::fixed(1)])
         .child(0, 0, inner as Box<dyn Widget>)
         .child(1, 0, cell_text("ZZ"));
-    let term = TestTerminal::new(&mut *root, Vec2::new(4, 2));
+    let term = Emulator::new(&mut *root, Vec2::new(4, 2));
     term.assert_lines([
         "aabb",
         "ZZ  ",
@@ -547,7 +547,7 @@ fn click_in_cell_routes_to_child() {
         .rows([Track::grow(1)])
         .child(0, 0, cell_text("left"))
         .child(0, 1, target as Box<dyn Widget>);
-    let _term = TestTerminal::new(&mut *root, Vec2::new(12, 1));
+    let _term = Emulator::new(&mut *root, Vec2::new(12, 1));
     let hit = root.descendant_at_pos(Vec2::new(10.0, 0.0), None);
     assert_eq!(hit, Some(target_id.untyped()));
 }
@@ -558,7 +558,7 @@ fn input_routes_into_cell_widget() {
         .columns([Track::grow(1)])
         .rows([Track::grow(1)])
         .child(0, 0, Input::new().flex(1) as Box<dyn Widget>);
-    let mut term = TestTerminal::new(&mut *root, Vec2::new(6, 1));
+    let mut term = Emulator::new(&mut *root, Vec2::new(6, 1));
     term.update(
         &mut *root,
         &[
@@ -577,7 +577,7 @@ fn track_basis_is_lower_bound_for_fixed() {
         .columns([Track::fixed(4)])
         .rows([Track::grow(1)])
         .child(0, 0, cell_text("ab"));
-    let term = TestTerminal::new(&mut *root, Vec2::new(6, 1));
+    let term = Emulator::new(&mut *root, Vec2::new(6, 1));
     term.assert_lines([
         "ab    ",
     ]);
@@ -590,7 +590,7 @@ fn multiple_children_at_same_origin_both_render() {
         .rows([Track::grow(1)])
         .child(0, 0, cell_text("AAA"))
         .child(0, 0, cell_text("B"));
-    let term = TestTerminal::new(&mut *root, Vec2::new(4, 1));
+    let term = Emulator::new(&mut *root, Vec2::new(4, 1));
     term.assert_lines([
         "BAA ",
     ]);
@@ -604,7 +604,7 @@ fn remove_at_only_removes_first_match() {
         .child(0, 0, cell_text("first"))
         .child(0, 0, cell_text("second"));
     assert!(root.remove_at(0, 0).is_some());
-    let mut term = TestTerminal::new(&mut *root, Vec2::new(7, 1));
+    let mut term = Emulator::new(&mut *root, Vec2::new(7, 1));
     term.update(&mut *root, &[RuntimeEvent::Resize(Vec2::new(7, 1))]);
     let snap = term.get_snapshot_text();
     assert!(snap.contains("second"), "expected 'second' to remain, got:\n{snap}");
@@ -618,7 +618,7 @@ fn border_external_only() {
         .rows([Track::grow(1)])
         .border(Border::SINGLE)
         .child(0, 0, cell_text("X"));
-    let term = TestTerminal::new(&mut *root, Vec2::new(3, 3));
+    let term = Emulator::new(&mut *root, Vec2::new(3, 3));
     term.assert_lines([
         "┌─┐",
         "│X│",
@@ -634,7 +634,7 @@ fn border_compact_rows_separates() {
         .row_borders(Border::SINGLE)
         .child(0, 0, cell_text("A"))
         .child(1, 0, cell_text("B"));
-    let term = TestTerminal::new(&mut *root, Vec2::new(1, 3));
+    let term = Emulator::new(&mut *root, Vec2::new(1, 3));
     term.assert_lines([
         "A",
         "─",
@@ -651,7 +651,7 @@ fn border_row_override_replaces_compact() {
         .row_top(1, Border::THICK)
         .child(0, 0, cell_text("A"))
         .child(1, 0, cell_text("B"));
-    let term = TestTerminal::new(&mut *root, Vec2::new(1, 3));
+    let term = Emulator::new(&mut *root, Vec2::new(1, 3));
     term.assert_lines([
         "A",
         "━",
@@ -667,7 +667,7 @@ fn border_cell_beats_row() {
         .row_top(1, Border::SINGLE)
         .child(0, 0, cell_text("A"))
         .cell(Cell::new(1, 0, cell_text("B")).border(Border::THICK));
-    let term = TestTerminal::new(&mut *root, Vec2::new(3, 3));
+    let term = Emulator::new(&mut *root, Vec2::new(3, 3));
     term.assert_lines([
         " A ",
         "┏━┓",
@@ -684,7 +684,7 @@ fn border_bottom_beats_top_tiebreak() {
         .row_top(1, Border::THICK)
         .child(0, 0, cell_text("A"))
         .child(1, 0, cell_text("B"));
-    let term = TestTerminal::new(&mut *root, Vec2::new(1, 3));
+    let term = Emulator::new(&mut *root, Vec2::new(1, 3));
     term.assert_lines([
         "A",
         "─",
@@ -704,7 +704,7 @@ fn border_junction_glyph_internal_cross() {
         .child(0, 1, cell_text("B"))
         .child(1, 0, cell_text("C"))
         .child(1, 1, cell_text("D"));
-    let term = TestTerminal::new(&mut *root, Vec2::new(5, 5));
+    let term = Emulator::new(&mut *root, Vec2::new(5, 5));
     term.assert_lines([
         "┌─┬─┐",
         "│A│B│",
@@ -721,7 +721,7 @@ fn border_external_only_grows_extent() {
         .rows([Track::grow(1)])
         .border(Border::SINGLE)
         .child(0, 0, cell_text("abc"));
-    let term = TestTerminal::new(&mut *root, Vec2::new(5, 3));
+    let term = Emulator::new(&mut *root, Vec2::new(5, 3));
     term.assert_lines([
         "┌───┐",
         "│abc│",
@@ -738,7 +738,7 @@ fn border_junction_thick_external_light_internal_vertical() {
         .col_borders(Border::SINGLE)
         .child(0, 0, cell_text("A"))
         .child(0, 1, cell_text("B"));
-    let term = TestTerminal::new(&mut *root, Vec2::new(5, 3));
+    let term = Emulator::new(&mut *root, Vec2::new(5, 3));
     term.assert_lines([
         "┏━┯━┓",
         "┃A│B┃",
@@ -755,7 +755,7 @@ fn border_junction_thick_external_light_internal_horizontal() {
         .row_borders(Border::SINGLE)
         .child(0, 0, cell_text("A"))
         .child(1, 0, cell_text("B"));
-    let term = TestTerminal::new(&mut *root, Vec2::new(3, 5));
+    let term = Emulator::new(&mut *root, Vec2::new(3, 5));
     term.assert_lines([
         "┏━┓",
         "┃A┃",
@@ -779,7 +779,7 @@ fn border_junctions_connect_with_gap() {
         .child(0, 1, cell_text("B"))
         .child(1, 0, cell_text("C"))
         .child(1, 1, cell_text("D"));
-    let term = TestTerminal::new(&mut *root, Vec2::new(6, 6));
+    let term = Emulator::new(&mut *root, Vec2::new(6, 6));
     term.assert_lines([
         "┌─┬──┐",
         "│A│ B│",
@@ -803,7 +803,7 @@ fn border_junction_thick_row_through_light_grid() {
         .child(0, 1, cell_text("B"))
         .child(1, 0, cell_text("C"))
         .child(1, 1, cell_text("D"));
-    let term = TestTerminal::new(&mut *root, Vec2::new(5, 5));
+    let term = Emulator::new(&mut *root, Vec2::new(5, 5));
     term.assert_lines([
         "┌─┬─┐",
         "│A│B│",
@@ -820,7 +820,7 @@ fn track_auto_sizes_to_child_pref() {
         .rows([Track::grow(1)])
         .child(0, 0, cell_text("hello"))
         .child(0, 1, cell_text("R"));
-    let term = TestTerminal::new(&mut *root, Vec2::new(10, 1));
+    let term = Emulator::new(&mut *root, Vec2::new(10, 1));
     term.assert_lines([
         "helloR    ",
     ]);
@@ -832,7 +832,7 @@ fn track_auto_with_no_children_is_zero() {
         .columns([Track::auto(), Track::grow(1)])
         .rows([Track::grow(1)])
         .child(0, 1, cell_text("X"));
-    let term = TestTerminal::new(&mut *root, Vec2::new(6, 1));
+    let term = Emulator::new(&mut *root, Vec2::new(6, 1));
     term.assert_lines([
         "X     ",
     ]);
@@ -845,7 +845,7 @@ fn track_auto_with_min_floor() {
         .rows([Track::grow(1)])
         .child(0, 0, cell_text("hi"))
         .child(0, 1, cell_text("R"));
-    let term = TestTerminal::new(&mut *root, Vec2::new(12, 1));
+    let term = Emulator::new(&mut *root, Vec2::new(12, 1));
     term.assert_lines([
         "hi      R   ",
     ]);
@@ -858,7 +858,7 @@ fn track_auto_with_max_clamps() {
         .rows([Track::grow(1)])
         .child(0, 0, cell_text("abcdef"))
         .child(0, 1, cell_text("R"));
-    let term = TestTerminal::new(&mut *root, Vec2::new(10, 1));
+    let term = Emulator::new(&mut *root, Vec2::new(10, 1));
     term.assert_lines([
         "abcR      ",
     ]);
@@ -871,7 +871,7 @@ fn track_fixed_overrides_child() {
         .rows([Track::grow(1)])
         .child(0, 0, cell_text("abcdef"))
         .child(0, 1, cell_text("R"));
-    let term = TestTerminal::new(&mut *root, Vec2::new(10, 1));
+    let term = Emulator::new(&mut *root, Vec2::new(10, 1));
     term.assert_lines([
         "abR       ",
     ]);
@@ -883,7 +883,7 @@ fn track_flex_grows_from_child_pref() {
         .columns([Track::grow(1)])
         .rows([Track::grow(1)])
         .child(0, 0, cell_text("hi"));
-    let term = TestTerminal::new(&mut *root, Vec2::new(8, 1));
+    let term = Emulator::new(&mut *root, Vec2::new(8, 1));
     term.assert_lines([
         "hi      ",
     ]);
@@ -896,7 +896,7 @@ fn track_flex_with_min() {
         .rows([Track::grow(1)])
         .child(0, 0, cell_text("a"))
         .child(0, 1, cell_text("b"));
-    let term = TestTerminal::new(&mut *root, Vec2::new(6, 1));
+    let term = Emulator::new(&mut *root, Vec2::new(6, 1));
     term.assert_lines([
         "a    b",
     ]);
@@ -909,7 +909,7 @@ fn track_flex_with_max_caps_growth() {
         .rows([Track::grow(1)])
         .child(0, 0, cell_text("L"))
         .child(0, 1, cell_text("R"));
-    let term = TestTerminal::new(&mut *root, Vec2::new(12, 1));
+    let term = Emulator::new(&mut *root, Vec2::new(12, 1));
     term.assert_lines([
         "L   R       ",
     ]);
@@ -922,7 +922,7 @@ fn track_pref_overrides_child_pref() {
         .rows([Track::grow(1)])
         .child(0, 0, cell_text("hi"))
         .child(0, 1, cell_text("R"));
-    let term = TestTerminal::new(&mut *root, Vec2::new(10, 1));
+    let term = Emulator::new(&mut *root, Vec2::new(10, 1));
     term.assert_lines([
         "hi    R   ",
     ]);
@@ -936,7 +936,7 @@ fn track_two_auto_cols_take_widest_child_pref() {
         .child(0, 0, cell_text("aa"))
         .child(0, 1, cell_text("bbbb"))
         .child(0, 2, cell_text("R"));
-    let term = TestTerminal::new(&mut *root, Vec2::new(10, 1));
+    let term = Emulator::new(&mut *root, Vec2::new(10, 1));
     term.assert_lines([
         "aabbbbR   ",
     ]);
@@ -950,7 +950,7 @@ fn track_mixed_fixed_auto_flex() {
         .child(0, 0, cell_text("XYZ"))
         .child(0, 1, cell_text("auto"))
         .child(0, 2, cell_text("F"));
-    let term = TestTerminal::new(&mut *root, Vec2::new(12, 1));
+    let term = Emulator::new(&mut *root, Vec2::new(12, 1));
     term.assert_lines([
         "XYZautoF    ",
     ]);
@@ -974,7 +974,7 @@ fn track_auto_row_sizes_to_child_pref() {
         .rows([Track::auto(), Track::grow(1)])
         .child(0, 0, cell_text("hi"))
         .child(1, 0, cell_text("bot"));
-    let term = TestTerminal::new(&mut *root, Vec2::new(3, 4));
+    let term = Emulator::new(&mut *root, Vec2::new(3, 4));
     term.assert_lines([
         "hi ",
         "bot",
@@ -990,7 +990,7 @@ fn track_auto_row_with_min_floor() {
         .rows([Track::auto().min(3), Track::grow(1)])
         .child(0, 0, cell_text("hi"))
         .child(1, 0, cell_text("b"));
-    let term = TestTerminal::new(&mut *root, Vec2::new(3, 5));
+    let term = Emulator::new(&mut *root, Vec2::new(3, 5));
     term.assert_lines([
         "hi ",
         "   ",
@@ -1007,7 +1007,7 @@ fn track_fixed_row_overrides_child() {
         .rows([Track::fixed(1), Track::grow(1)])
         .child(0, 0, cell_text("hi"))
         .child(1, 0, cell_text("b"));
-    let term = TestTerminal::new(&mut *root, Vec2::new(3, 4));
+    let term = Emulator::new(&mut *root, Vec2::new(3, 4));
     term.assert_lines([
         "hi ",
         "b  ",
@@ -1027,7 +1027,7 @@ fn cell_padding_default_with_per_cell_override() {
         .child(1, 1, cell_text("D"))
         .padding_left(1)
         .padding_top(1);
-    let term = TestTerminal::new(&mut *root, Vec2::new(8, 8));
+    let term = Emulator::new(&mut *root, Vec2::new(8, 8));
     term.assert_lines([
         "A       ",
         "     B  ",
@@ -1058,7 +1058,7 @@ fn row_style_bordered_paints_gaps_and_external_v_borders() {
         .child(1, 1, cell_text("DD"))
         .row_style(1, Style::new().bg(r_bg))
         .col_style(1, Style::new().bg(c_bg));
-    let term = TestTerminal::new(&mut *root, Vec2::new(8, 6));
+    let term = Emulator::new(&mut *root, Vec2::new(8, 6));
     let bg = bg_grid(&term.get_snapshot());
     let r = Some(r_bg);
     let c = Some(c_bg);
@@ -1088,7 +1088,7 @@ fn cell_style_overrides_combined_row_col_fill() {
         .child(1, 1, cell_text("DD"))
         .row_style(0, Style::new().bg(r_bg))
         .col_style(0, Style::new().bg(c_bg));
-    let term = TestTerminal::new(&mut *root, Vec2::new(4, 2));
+    let term = Emulator::new(&mut *root, Vec2::new(4, 2));
     let bg = bg_grid(&term.get_snapshot());
     let r = Some(r_bg);
     let c = Some(c_bg);
@@ -1116,7 +1116,7 @@ fn per_track_border_style_colors_inner_glyphs() {
         .child(1, 1, cell_text("D"))
         .row_border_style(1, Style::new().fg(r_fg))
         .col_border_style(1, Style::new().fg(c_fg));
-    let term = TestTerminal::new(&mut *root, Vec2::new(5, 5));
+    let term = Emulator::new(&mut *root, Vec2::new(5, 5));
     let fg = fg_grid(&term.get_snapshot());
     let r = Some(r_fg);
     let c = Some(c_fg);
@@ -1143,7 +1143,7 @@ fn col_span_footer_no_row_borders_bug() {
         .child(0, 2, cell_text("C"))
         .cell(Cell::new(1, 0, cell_text("X")).span(1, 2))
         .child(1, 2, cell_text("Z"));
-    let term = TestTerminal::new(&mut *root, Vec2::new(7, 4));
+    let term = Emulator::new(&mut *root, Vec2::new(7, 4));
     term.assert_lines([
         "┌─┬─┬─┐",
         "│A│B│C│",
@@ -1165,7 +1165,7 @@ fn col_span_footer_with_row_borders_bug() {
         .child(0, 2, cell_text("C"))
         .cell(Cell::new(1, 0, cell_text("X")).span(1, 2))
         .child(1, 2, cell_text("Z"));
-    let term = TestTerminal::new(&mut *root, Vec2::new(7, 5));
+    let term = Emulator::new(&mut *root, Vec2::new(7, 5));
     term.assert_lines([
         "┌─┬─┬─┐",
         "│A│B│C│",

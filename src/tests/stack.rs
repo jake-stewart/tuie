@@ -1,14 +1,14 @@
 //! Integration tests for the stack widget.
 
 use tuie::prelude::*;
-use tuie::test::TestTerminal;
+use tuie::emulator::Emulator;
 
 #[test]
 fn renders_base_only() {
     let mut root = Stack::new(
         Pane::new().bordered().children([Text::new().content("base")]),
     );
-    let term = TestTerminal::new(&mut *root, Vec2::new(6, 3));
+    let term = Emulator::new(&mut *root, Vec2::new(6, 3));
     term.assert_lines([
         "┌────┐",
         "│base│",
@@ -27,7 +27,7 @@ fn layer_overlays_base() {
             Text::new().content("BB").width(2).height(1).margin_left(2),
         ]),
     ]);
-    let term = TestTerminal::new(&mut *root, Vec2::new(6, 1));
+    let term = Emulator::new(&mut *root, Vec2::new(6, 1));
     term.assert_lines([
         "aaBBaa",
     ]);
@@ -47,7 +47,7 @@ fn multiple_layers_z_order() {
             Text::new().content("TT").width(2).height(1).margin_left(3),
         ]),
     ]);
-    let term = TestTerminal::new(&mut *root, Vec2::new(8, 1));
+    let term = Emulator::new(&mut *root, Vec2::new(8, 1));
     term.assert_lines([
         ".LLTT...",
     ]);
@@ -62,7 +62,7 @@ fn layer_obscures_base_content() {
     .children([
         Pane::new().flex(1).children([Text::new().content("yyyyy")]),
     ]);
-    let term = TestTerminal::new(&mut *root, Vec2::new(5, 1));
+    let term = Emulator::new(&mut *root, Vec2::new(5, 1));
     term.assert_lines([
         "yyyyy",
     ]);
@@ -79,7 +79,7 @@ fn resize_drives_base_and_layers() {
             Text::new().content("XX").width(2).height(1).margin_left(1).margin_top(1),
         ]),
     ]);
-    let mut term = TestTerminal::new(&mut *root, Vec2::new(8, 3));
+    let mut term = Emulator::new(&mut *root, Vec2::new(8, 3));
     term.assert_lines([
         "┌──────┐",
         "│XXse  │",
@@ -105,7 +105,7 @@ fn layer_aligned_to_end() {
             Text::new().content("END").width(3).height(1),
         ]),
     ]);
-    let term = TestTerminal::new(&mut *root, Vec2::new(10, 1));
+    let term = Emulator::new(&mut *root, Vec2::new(10, 1));
     term.assert_lines([
         ".......END",
     ]);
@@ -120,7 +120,7 @@ fn layer_click_takes_precedence_over_base() {
     let mut root = Stack::new(Pane::new().flex(1).children([base_text]))
         .flex(1)
         .children([Pane::new().flex(1).children([layer_text])]);
-    let _term = TestTerminal::new(&mut *root, Vec2::new(6, 1));
+    let _term = Emulator::new(&mut *root, Vec2::new(6, 1));
 
     let mut path: Vec<WidgetId> = Vec::new();
     let hit = root.descendant_at_pos(Vec2::new(3.0, 0.0), Some(&mut path));
@@ -136,7 +136,7 @@ fn click_outside_layer_hits_base() {
     let mut root = Stack::new(Pane::new().flex(1).children([base_text]))
         .flex(1)
         .children([Pane::new().flex(1).children([layer_text])]);
-    let _term = TestTerminal::new(&mut *root, Vec2::new(6, 1));
+    let _term = Emulator::new(&mut *root, Vec2::new(6, 1));
 
     let hit = root.descendant_at_pos(Vec2::new(5.0, 0.0), None);
     assert_eq!(hit, Some(base_id.untyped()));
@@ -159,7 +159,7 @@ fn nested_stacks_outer_layer_on_top() {
             Text::new().content("OO").width(2).height(1).margin_left(4),
         ]),
     ]);
-    let term = TestTerminal::new(&mut *root, Vec2::new(6, 1));
+    let term = Emulator::new(&mut *root, Vec2::new(6, 1));
     term.assert_lines([
         "BiiBOO",
     ]);
@@ -175,7 +175,7 @@ fn clear_and_add_child_round_trip() {
         Pane::new().flex(1).children([Text::new().content("yyyyy")]),
     ]);
 
-    let mut term = TestTerminal::new(&mut *root, Vec2::new(5, 1));
+    let mut term = Emulator::new(&mut *root, Vec2::new(5, 1));
     term.assert_lines(["yyyyy"]);
 
     root.clear();
@@ -202,7 +202,7 @@ fn remove_child_by_id() {
     .flex(1)
     .children([layer]);
 
-    let mut term = TestTerminal::new(&mut *root, Vec2::new(5, 1));
+    let mut term = Emulator::new(&mut *root, Vec2::new(5, 1));
     term.assert_lines(["yyyyy"]);
 
     root.remove(layer_id.untyped());
