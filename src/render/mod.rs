@@ -426,7 +426,7 @@ impl<'a> RowWriter<'a> {
             if c == '\n' {
                 break;
             }
-            let w = terminal_grapheme_width(grapheme) as usize;
+            let w = terminal_grapheme_width(grapheme);
             self.cell(col).grapheme(grapheme);
             col += w;
         }
@@ -725,7 +725,7 @@ fn glyph_dirty_cols(glyph: &str, is_wide: bool, current: i32) -> i32 {
 }
 
 /// Returns the terminal cell width of a single grapheme cluster.
-pub fn terminal_grapheme_width(grapheme: &str) -> u8 {
+pub fn terminal_grapheme_width(grapheme: &str) -> usize {
     let bytes = grapheme.as_bytes();
     if bytes.len() == 1 && bytes[0] < 0x80 {
         return if bytes[0] < 0x20 || bytes[0] == 0x7F {
@@ -748,7 +748,7 @@ pub fn terminal_grapheme_width(grapheme: &str) -> u8 {
 /// Returns the sum of [`terminal_grapheme_width`] for every grapheme in `text`.
 pub fn terminal_display_width(text: &str) -> usize {
     text.graphemes(true)
-        .fold(0, |acc, grapheme| acc + terminal_grapheme_width(grapheme) as usize)
+        .fold(0, |acc, grapheme| acc + terminal_grapheme_width(grapheme))
 }
 
 impl GridRendererState {
@@ -1469,7 +1469,7 @@ impl<'a> RenderContext<'a> {
             if c == '\n' {
                 break;
             }
-            let w = terminal_grapheme_width(grapheme) as usize;
+            let w = terminal_grapheme_width(grapheme);
             advance += w as i32;
 
             let (g, w) = if col + w > range.end {

@@ -345,7 +345,7 @@ impl<'a> TextOverflowLineIterator<'a> {
                 let mut shown_width = 0usize;
                 let mut shown_end = line.len();
                 for (i, g) in line.grapheme_indices(true) {
-                    let grapheme_width = tuie::terminal_grapheme_width(g) as usize;
+                    let grapheme_width = tuie::terminal_grapheme_width(g);
                     if skipped_width < overflow_columns {
                         skipped_width += grapheme_width;
                         skip_end = i + g.len();
@@ -573,7 +573,7 @@ impl TextOverflow {
                 return tabstop - (col % tabstop);
             }
         }
-        tuie::terminal_grapheme_width(grapheme) as usize
+        tuie::terminal_grapheme_width(grapheme)
     }
 
     /// Returns an iterator over the visual lines of `text` bounded by `max_size` cells.

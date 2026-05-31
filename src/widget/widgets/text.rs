@@ -483,7 +483,7 @@ impl Text {
                         if offset > index {
                             break;
                         }
-                        w += tuie::terminal_grapheme_width(grapheme) as usize;
+                        w += tuie::terminal_grapheme_width(grapheme);
                     }
                     break;
                 }
