@@ -421,8 +421,8 @@ fn child_inherits_reverse_as_concrete_swapped_colors() {
     let term = Emulator::new(&mut *root, Vec2::new(4, 1));
     let snap = term.get_snapshot();
     let style = style_at_text(&snap, "Hi");
-    assert_eq!(style.fg, Some(Color::Background));
-    assert_eq!(style.bg, Some(Color::Indexed(4)));
+    assert_eq!(style.get_fg(), Some(Color::Background));
+    assert_eq!(style.get_bg(), Some(Color::Indexed(4)));
     assert!(!style.has_reverse());
 }
 
@@ -435,5 +435,5 @@ fn child_keeps_its_own_reverse() {
     let snap = term.get_snapshot();
     let style = style_at_text(&snap, "Hi");
     assert!(style.has_reverse());
-    assert_eq!(style.fg, Some(Color::Indexed(4)));
+    assert_eq!(style.get_fg(), Some(Color::Indexed(4)));
 }

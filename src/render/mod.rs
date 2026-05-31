@@ -161,16 +161,16 @@ impl GridCellStyle {
     };
 
     fn apply(&mut self, style: &Style) {
-        if let Some(fg) = style.fg {
+        if let Some(fg) = style.get_fg() {
             self.fg = fg;
         }
-        if let Some(bg) = style.bg {
+        if let Some(bg) = style.get_bg() {
             self.bg = bg;
         }
-        if let Some(uc) = style.underline_color {
+        if let Some(uc) = style.get_underline_color() {
             self.underline_color = uc;
         }
-        if let Some(u) = style.underline {
+        if let Some(u) = style.get_underline() {
             self.underline = u;
         }
         let mask = style.get_attrs_mask();
@@ -546,7 +546,7 @@ impl CellWriter<'_> {
         match style.get_blend() {
             Some(b) if b < 100 => {
                 let reversed = style.has_reverse();
-                let overlay = style.overlay_color();
+                let overlay = style.get_overlay_color();
                 resolve_dim(&mut cell.style);
                 let prev = cell.style.visible_bg();
                 cell.style.apply(style);
@@ -1221,7 +1221,7 @@ impl<'a> RenderContext<'a> {
         self.set_style(child_style);
         if !self.resolve_inherited_reverse(&child_style) {
             let blend = self.style.get_blend().unwrap_or(100);
-            if child_style.overlay_color().is_none() && blend < 100 {
+            if child_style.get_overlay_color().is_none() && blend < 100 {
                 self.style.set_overlay_color(None);
             }
         }
@@ -1233,11 +1233,11 @@ impl<'a> RenderContext<'a> {
         let child_owns_reverse =
             child_style.get_attrs_mask() & StyleAttribute::Reverse as u8 != 0;
         if self.style.has_reverse() && !child_owns_reverse {
-            let visible_bg = self.style.fg.unwrap_or(Color::Foreground);
-            let visible_fg = self.style.bg.unwrap_or(Color::Background);
+            let visible_bg = self.style.get_fg().unwrap_or(Color::Foreground);
+            let visible_fg = self.style.get_bg().unwrap_or(Color::Background);
             self.style.set_reverse(false);
-            self.style.fg = Some(visible_fg);
-            self.style.bg = Some(visible_bg);
+            self.style.set_fg(Some(visible_fg));
+            self.style.set_bg(Some(visible_bg));
             return true;
         }
         false
@@ -1358,7 +1358,7 @@ impl<'a> RenderContext<'a> {
 
     /// Fills this region with the active background color.
     pub fn clear(&mut self) {
-        let overlay = self.style.overlay_color();
+        let overlay = self.style.get_overlay_color();
         if overlay.is_none() {
             return;
         }
@@ -1408,11 +1408,11 @@ impl<'a> RenderContext<'a> {
                 }
             }
             if self.style.has_reverse() {
-                self.style.fg = None;
-                self.base.fg = None;
+                self.style.set_fg(None);
+                self.base.set_fg(None);
             } else {
-                self.style.bg = None;
-                self.base.bg = None;
+                self.style.set_bg(None);
+                self.base.set_bg(None);
             }
         }
     }
@@ -1451,7 +1451,7 @@ impl<'a> RenderContext<'a> {
         }
 
         let style = self.style;
-        let overlay_bg = style.overlay_color();
+        let overlay_bg = style.get_overlay_color();
 
         let mut row = self.row_writer();
         let range = row.get_range();

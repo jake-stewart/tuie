@@ -43,14 +43,10 @@ const fn clamp_blend(v: u8) -> NonMaxU8 {
 /// Foreground, background, underline, and boolean attributes for a cell.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Style {
-    /// Foreground color, or `None` to inherit.
-    pub fg: Option<Color>,
-    /// Background color, or `None` to inherit.
-    pub bg: Option<Color>,
-    /// Underline color, or `None` to use the foreground.
-    pub underline_color: Option<Color>,
-    /// Underline shape, or `None` to inherit.
-    pub underline: Option<UnderlineType>,
+    fg: Option<Color>,
+    bg: Option<Color>,
+    underline_color: Option<Color>,
+    underline: Option<UnderlineType>,
     attrs: u8,
     mask: u8,
     blend: Option<NonMaxU8>,
@@ -166,11 +162,45 @@ impl Style {
         self
     }
 
+    /// Sets or clears the foreground color via builder.
+    #[must_use]
+    pub const fn fg_opt(mut self, color: Option<Color>) -> Self {
+        self.fg = color;
+        self
+    }
+
+    /// Returns the foreground color, if any.
+    pub const fn get_fg(&self) -> Option<Color> {
+        self.fg
+    }
+
+    /// Sets or clears the foreground color.
+    pub const fn set_fg(&mut self, color: Option<Color>) {
+        self.fg = color;
+    }
+
     /// Sets the background color.
     #[must_use]
     pub const fn bg(mut self, color: Color) -> Self {
         self.bg = Some(color);
         self
+    }
+
+    /// Sets or clears the background color via builder.
+    #[must_use]
+    pub const fn bg_opt(mut self, color: Option<Color>) -> Self {
+        self.bg = color;
+        self
+    }
+
+    /// Returns the background color, if any.
+    pub const fn get_bg(&self) -> Option<Color> {
+        self.bg
+    }
+
+    /// Sets or clears the background color.
+    pub const fn set_bg(&mut self, color: Option<Color>) {
+        self.bg = color;
     }
 
     /// Sets the underline shape to `Some(underline)`.
@@ -202,6 +232,23 @@ impl Style {
     pub const fn underline_color(mut self, color: Color) -> Self {
         self.underline_color = Some(color);
         self
+    }
+
+    /// Sets or clears the underline color via builder.
+    #[must_use]
+    pub const fn underline_color_opt(mut self, color: Option<Color>) -> Self {
+        self.underline_color = color;
+        self
+    }
+
+    /// Returns the underline color, if any.
+    pub const fn get_underline_color(&self) -> Option<Color> {
+        self.underline_color
+    }
+
+    /// Sets or clears the underline color.
+    pub const fn set_underline_color(&mut self, color: Option<Color>) {
+        self.underline_color = color;
     }
 
     const fn write_attr(&mut self, attr: StyleAttribute, value: bool) {
@@ -308,7 +355,7 @@ impl Style {
     }
 
     /// Returns the color that becomes the visible background: `fg` under reverse, else `bg`.
-    pub const fn overlay_color(&self) -> Option<Color> {
+    pub const fn get_overlay_color(&self) -> Option<Color> {
         if self.has_reverse() {
             self.fg
         } else {

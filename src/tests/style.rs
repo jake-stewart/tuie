@@ -7,8 +7,8 @@ fn apply_later_overrides_earlier_colors() {
     let a = Style::new().fg(Color::RED).bg(Color::BLUE);
     let b = Style::new().fg(Color::GREEN);
     let merged = a.apply(b);
-    assert_eq!(merged.fg, Some(Color::GREEN));
-    assert_eq!(merged.bg, Some(Color::BLUE));
+    assert_eq!(merged.get_fg(), Some(Color::GREEN));
+    assert_eq!(merged.get_bg(), Some(Color::BLUE));
 }
 
 #[test]
@@ -18,7 +18,7 @@ fn apply_preserves_untouched_fields() {
     let merged = base.apply(overlay);
     assert!(merged.has_bold());
     assert!(merged.has_italic());
-    assert_eq!(merged.fg, Some(Color::RED));
+    assert_eq!(merged.get_fg(), Some(Color::RED));
 }
 
 #[test]
@@ -35,8 +35,8 @@ fn apply_underline_color_overlays() {
     let base = Style::new().underline(UnderlineType::Single).underline_color(Color::RED);
     let overlay = Style::new().underline(UnderlineType::Curly);
     let merged = base.apply(overlay);
-    assert_eq!(merged.underline, Some(UnderlineType::Curly));
-    assert_eq!(merged.underline_color, Some(Color::RED));
+    assert_eq!(merged.get_underline(), Some(UnderlineType::Curly));
+    assert_eq!(merged.get_underline_color(), Some(Color::RED));
 }
 
 #[test]
@@ -61,14 +61,14 @@ fn stylize_trait_on_str() {
 
     let s = "y".italic().fg(Color::BLUE).bg(Color::YELLOW);
     assert!(s.style.has_italic());
-    assert_eq!(s.style.fg, Some(Color::BLUE));
-    assert_eq!(s.style.bg, Some(Color::YELLOW));
+    assert_eq!(s.style.get_fg(), Some(Color::BLUE));
+    assert_eq!(s.style.get_bg(), Some(Color::YELLOW));
 
     let s = "u".underline(UnderlineType::Curly);
-    assert_eq!(s.style.underline, Some(UnderlineType::Curly));
+    assert_eq!(s.style.get_underline(), Some(UnderlineType::Curly));
 
     let s = "b".red_bg();
-    assert_eq!(s.style.bg, Some(Color::RED));
+    assert_eq!(s.style.get_bg(), Some(Color::RED));
 }
 
 fn parse_one(input: &str) -> Style {
@@ -88,7 +88,7 @@ fn ansi_attribute_codes_set_and_clear() {
     assert!(parse_one("\x1b[1mx").has_bold());
     assert!(parse_one("\x1b[2mx").has_dim());
     assert!(parse_one("\x1b[3mx").has_italic());
-    assert_eq!(parse_one("\x1b[4mx").underline, Some(UnderlineType::Single));
+    assert_eq!(parse_one("\x1b[4mx").get_underline(), Some(UnderlineType::Single));
     assert!(parse_one("\x1b[7mx").has_reverse());
     assert!(parse_one("\x1b[9mx").has_strikethrough());
 
@@ -96,25 +96,25 @@ fn ansi_attribute_codes_set_and_clear() {
     assert!(!s.has_bold());
     assert!(!s.has_dim());
     assert!(!s.has_italic());
-    assert_eq!(s.underline, None);
+    assert_eq!(s.get_underline(), None);
     assert!(!s.has_reverse());
     assert!(!s.has_strikethrough());
 }
 
 #[test]
 fn ansi_16_color_fg_bg_including_bright() {
-    assert_eq!(parse_one("\x1b[31mx").fg, Some(Color::Indexed(1)));
-    assert_eq!(parse_one("\x1b[47mx").bg, Some(Color::Indexed(7)));
-    assert_eq!(parse_one("\x1b[90mx").fg, Some(Color::Indexed(8)));
-    assert_eq!(parse_one("\x1b[107mx").bg, Some(Color::Indexed(15)));
+    assert_eq!(parse_one("\x1b[31mx").get_fg(), Some(Color::Indexed(1)));
+    assert_eq!(parse_one("\x1b[47mx").get_bg(), Some(Color::Indexed(7)));
+    assert_eq!(parse_one("\x1b[90mx").get_fg(), Some(Color::Indexed(8)));
+    assert_eq!(parse_one("\x1b[107mx").get_bg(), Some(Color::Indexed(15)));
 }
 
 #[test]
 fn ansi_extended_color_formats() {
-    assert_eq!(parse_one("\x1b[38;5;200mx").fg, Some(Color::Indexed(200)));
-    assert_eq!(parse_one("\x1b[48;5;42mx").bg, Some(Color::Indexed(42)));
-    assert_eq!(parse_one("\x1b[38;2;10;20;30mx").fg, Some(Color::Rgb(10, 20, 30)));
-    assert_eq!(parse_one("\x1b[48;2;255;128;0mx").bg, Some(Color::Rgb(255, 128, 0)));
+    assert_eq!(parse_one("\x1b[38;5;200mx").get_fg(), Some(Color::Indexed(200)));
+    assert_eq!(parse_one("\x1b[48;5;42mx").get_bg(), Some(Color::Indexed(42)));
+    assert_eq!(parse_one("\x1b[38;2;10;20;30mx").get_fg(), Some(Color::Rgb(10, 20, 30)));
+    assert_eq!(parse_one("\x1b[48;2;255;128;0mx").get_bg(), Some(Color::Rgb(255, 128, 0)));
 }
 
 #[test]
@@ -123,8 +123,8 @@ fn ansi_default_color_codes() {
     p.parse_line("\x1b[31;41mtext");
     let out = p.parse_line("\x1b[39;49mnext");
     let style = out.style_at(out.len());
-    assert_eq!(style.fg, None);
-    assert_eq!(style.bg, None);
+    assert_eq!(style.get_fg(), None);
+    assert_eq!(style.get_bg(), None);
 }
 
 #[test]
@@ -174,14 +174,14 @@ fn parse_bold_red_either_order() {
     let b = parse("red-bold");
     assert_eq!(a, b);
     assert!(a.has_bold());
-    assert_eq!(a.fg, Some(Color::RED));
+    assert_eq!(a.get_fg(), Some(Color::RED));
 }
 
 #[test]
 fn parse_blend_in_bg_piece() {
     let s = parse("red-on-50%-blue");
-    assert_eq!(s.fg, Some(Color::RED));
-    assert_eq!(s.bg, Some(Color::BLUE));
+    assert_eq!(s.get_fg(), Some(Color::RED));
+    assert_eq!(s.get_bg(), Some(Color::BLUE));
     assert_eq!(s.get_blend(), Some(50));
 }
 
@@ -194,62 +194,62 @@ fn parse_blend_outside_bg_piece_errors() {
 #[test]
 fn parse_bright_colour() {
     let s = parse("bright-red");
-    assert_eq!(s.fg, Some(Color::BRIGHT_RED));
+    assert_eq!(s.get_fg(), Some(Color::BRIGHT_RED));
 }
 
 #[test]
 fn parse_fg_bg_keywords_are_terminal_defaults() {
     let s = parse("bg-on-fg");
-    assert_eq!(s.fg, Some(Color::Background));
-    assert_eq!(s.bg, Some(Color::Foreground));
+    assert_eq!(s.get_fg(), Some(Color::Background));
+    assert_eq!(s.get_bg(), Some(Color::Foreground));
 }
 
 #[test]
 fn parse_underline_without_colour() {
     let bare = parse("underline");
-    assert_eq!(bare.underline, Some(UnderlineType::Single));
-    assert_eq!(bare.underline_color, None);
+    assert_eq!(bare.get_underline(), Some(UnderlineType::Single));
+    assert_eq!(bare.get_underline_color(), None);
 
     let with_line_style = parse("curly-underline");
-    assert_eq!(with_line_style.underline, Some(UnderlineType::Curly));
-    assert_eq!(with_line_style.underline_color, None);
+    assert_eq!(with_line_style.get_underline(), Some(UnderlineType::Curly));
+    assert_eq!(with_line_style.get_underline_color(), None);
 }
 
 #[test]
 fn parse_line_style_with_colour() {
     let s = parse("single-red-underline");
-    assert_eq!(s.underline, Some(UnderlineType::Single));
-    assert_eq!(s.underline_color, Some(Color::RED));
+    assert_eq!(s.get_underline(), Some(UnderlineType::Single));
+    assert_eq!(s.get_underline_color(), Some(Color::RED));
 }
 
 #[test]
 fn parse_full_three_piece() {
     let s = parse("red-on-blue-single-green-underline");
-    assert_eq!(s.fg, Some(Color::RED));
-    assert_eq!(s.bg, Some(Color::BLUE));
-    assert_eq!(s.underline, Some(UnderlineType::Single));
-    assert_eq!(s.underline_color, Some(Color::GREEN));
+    assert_eq!(s.get_fg(), Some(Color::RED));
+    assert_eq!(s.get_bg(), Some(Color::BLUE));
+    assert_eq!(s.get_underline(), Some(UnderlineType::Single));
+    assert_eq!(s.get_underline_color(), Some(Color::GREEN));
 }
 
 #[test]
 fn parse_underline_then_fg_keeps_default_underline_colour() {
     let s = parse("underline-red");
-    assert_eq!(s.underline, Some(UnderlineType::Single));
-    assert_eq!(s.underline_color, None);
-    assert_eq!(s.fg, Some(Color::RED));
+    assert_eq!(s.get_underline(), Some(UnderlineType::Single));
+    assert_eq!(s.get_underline_color(), None);
+    assert_eq!(s.get_fg(), Some(Color::RED));
 }
 
 #[test]
 fn parse_two_fg_colours_last_wins() {
     let s = parse("red-blue");
-    assert_eq!(s.fg, Some(Color::BLUE));
+    assert_eq!(s.get_fg(), Some(Color::BLUE));
 }
 
 #[test]
 fn parse_on_red_blue_closes_bg_after_colour() {
     let s = parse("on-red-blue");
-    assert_eq!(s.bg, Some(Color::RED));
-    assert_eq!(s.fg, Some(Color::BLUE));
+    assert_eq!(s.get_bg(), Some(Color::RED));
+    assert_eq!(s.get_fg(), Some(Color::BLUE));
 }
 
 #[test]
@@ -316,10 +316,10 @@ fn parse_line_style_inside_underline_errors() {
 #[test]
 fn parse_no_writes_explicit_false() {
     let s = parse("bold-red-no-bold");
-    assert_eq!(s.fg, Some(Color::RED));
+    assert_eq!(s.get_fg(), Some(Color::RED));
     assert!(!s.has_bold());
     assert!(s.get_attrs_mask() & (StyleAttribute::Bold as u8) != 0);
-    assert_eq!(parse("no-underline").underline, Some(UnderlineType::None));
+    assert_eq!(parse("no-underline").get_underline(), Some(UnderlineType::None));
 }
 
 #[test]
@@ -331,9 +331,9 @@ fn parse_no_unknown_target_errors() {
 #[test]
 fn parse_plain_writes_concrete_defaults() {
     let s = parse("plain-red");
-    assert_eq!(s.fg, Some(Color::RED));
-    assert_eq!(s.bg, Some(Color::Background));
-    assert_eq!(s.underline, Some(UnderlineType::None));
+    assert_eq!(s.get_fg(), Some(Color::RED));
+    assert_eq!(s.get_bg(), Some(Color::Background));
+    assert_eq!(s.get_underline(), Some(UnderlineType::None));
     let all_attrs = (StyleAttribute::Bold as u8)
         | (StyleAttribute::Italic as u8)
         | (StyleAttribute::Dim as u8)
@@ -366,7 +366,7 @@ fn styled_string_push_span_styled_applies_style() {
     assert_eq!(s.as_str(), "hi");
     let total: usize = s.iter_chunks(..).map(|(c, _)| c.len()).sum();
     assert_eq!(total, s.len());
-    assert_eq!(s.style_at(0).fg, Some(Color::RED));
+    assert_eq!(s.style_at(0).get_fg(), Some(Color::RED));
 }
 
 #[test]
@@ -406,10 +406,10 @@ fn styled_string_style_at_span_boundaries() {
     let mut s = StyledString::new();
     s.push_span("abc".red());
     s.push_span("def".blue());
-    assert_eq!(s.style_at(0).fg, Some(Color::RED));
-    assert_eq!(s.style_at(2).fg, Some(Color::RED));
-    assert_eq!(s.style_at(3).fg, Some(Color::BLUE));
-    assert_eq!(s.style_at(5).fg, Some(Color::BLUE));
+    assert_eq!(s.style_at(0).get_fg(), Some(Color::RED));
+    assert_eq!(s.style_at(2).get_fg(), Some(Color::RED));
+    assert_eq!(s.style_at(3).get_fg(), Some(Color::BLUE));
+    assert_eq!(s.style_at(5).get_fg(), Some(Color::BLUE));
     assert_eq!(s.style_at(s.len()), Style::new());
 }
 
@@ -452,8 +452,8 @@ fn styled_string_drop_start_drops_bytes_and_styles() {
     assert_eq!(s.as_str(), "def");
     let total: usize = s.iter_chunks(..).map(|(c, _)| c.len()).sum();
     assert_eq!(total, s.len());
-    assert!(s.iter_chunks(..).any(|(_, st)| st.fg == Some(Color::BLUE)));
-    assert!(!s.iter_chunks(..).any(|(_, st)| st.fg == Some(Color::RED)));
+    assert!(s.iter_chunks(..).any(|(_, st)| st.get_fg() == Some(Color::BLUE)));
+    assert!(!s.iter_chunks(..).any(|(_, st)| st.get_fg() == Some(Color::RED)));
 }
 
 #[test]
@@ -523,10 +523,10 @@ fn styled_string_replace_range_preserves_surrounding_styles() {
     s.push_span("def".blue());
     s.replace_range(2..4, "XY");
     assert_eq!(s.as_str(), "abXYef");
-    assert_eq!(s.style_at(0).fg, Some(Color::RED));
-    assert_eq!(s.style_at(2).fg, Some(Color::RED));
-    assert_eq!(s.style_at(3).fg, Some(Color::RED));
-    assert_eq!(s.style_at(4).fg, Some(Color::BLUE));
+    assert_eq!(s.style_at(0).get_fg(), Some(Color::RED));
+    assert_eq!(s.style_at(2).get_fg(), Some(Color::RED));
+    assert_eq!(s.style_at(3).get_fg(), Some(Color::RED));
+    assert_eq!(s.style_at(4).get_fg(), Some(Color::BLUE));
 }
 
 #[test]
@@ -536,8 +536,8 @@ fn styled_string_replace_range_accepts_open_ranges() {
     s.push_span("def".blue());
     s.replace_range(3.., "!");
     assert_eq!(s.as_str(), "abc!");
-    assert_eq!(s.style_at(0).fg, Some(Color::RED));
-    assert_eq!(s.style_at(3).fg, Some(Color::BLUE));
+    assert_eq!(s.style_at(0).get_fg(), Some(Color::RED));
+    assert_eq!(s.style_at(3).get_fg(), Some(Color::BLUE));
 }
 
 #[test]
@@ -565,7 +565,7 @@ fn styled_string_append_preserves_styles() {
     other.style_range(0..1, |st| st.set_bold(true));
     s.append(&other);
     assert_eq!(s.as_str(), "abcd");
-    assert_eq!(s.style_at(0).fg, Some(Color::RED));
+    assert_eq!(s.style_at(0).get_fg(), Some(Color::RED));
     assert!(s.style_at(2).has_bold());
     assert_eq!(s.style_at(3), Style::new());
 }

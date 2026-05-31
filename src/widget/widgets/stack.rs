@@ -207,8 +207,8 @@ impl Widget for Stack {
 
     fn render(&self, mut ctx: RenderContext) {
         let mut clear_style = self.layout.style;
-        if clear_style.bg.is_none() {
-            clear_style.bg = Some(Color::Background);
+        if clear_style.get_bg().is_none() {
+            clear_style.set_bg(Some(Color::Background));
         }
         ctx.set_style(clear_style);
         ctx.clear();

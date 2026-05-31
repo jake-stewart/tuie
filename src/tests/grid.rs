@@ -9,11 +9,11 @@ fn cell_text(s: &'static str) -> Box<dyn Widget> {
 }
 
 fn bg_grid(snap: &StyledString) -> Vec<Vec<Option<Color>>> {
-    color_grid(snap, |s| s.bg)
+    color_grid(snap, |s| s.get_bg())
 }
 
 fn fg_grid(snap: &StyledString) -> Vec<Vec<Option<Color>>> {
-    color_grid(snap, |s| s.fg)
+    color_grid(snap, |s| s.get_fg())
 }
 
 fn color_grid(

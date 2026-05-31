@@ -941,8 +941,8 @@ fn paint_cursor_overlay(
     let merged = underlying_style.apply(cursor_style);
     let reversed = cursor_style.has_reverse();
 
-    let fg_color = merged.fg.unwrap_or(Color::Foreground);
-    let bg_color = merged.bg.unwrap_or(Color::Background);
+    let fg_color = merged.get_fg().unwrap_or(Color::Foreground);
+    let bg_color = merged.get_bg().unwrap_or(Color::Background);
     let mut fg_rgba = gpu::u32_to_rgba(resolve_color(fg_color));
     let mut bg_rgba = gpu::u32_to_rgba(resolve_color(bg_color));
     if merged.has_dim() {
@@ -954,7 +954,7 @@ fn paint_cursor_overlay(
 
     match shape {
         CursorShape::Block => {
-            let underline_rgba = match merged.underline_color {
+            let underline_rgba = match merged.get_underline_color() {
                 Some(c) => gpu::u32_to_rgba(resolve_color(c)),
                 None => fg_rgba,
             };
@@ -968,7 +968,7 @@ fn paint_cursor_overlay(
                 bold: merged.has_bold(),
                 italic: merged.has_italic(),
                 strikethrough: merged.has_strikethrough(),
-                underline: merged.underline.unwrap_or(UnderlineType::None),
+                underline: merged.get_underline().unwrap_or(UnderlineType::None),
             };
             backend.push_cell(cx, cy, glyph, &cell, font);
         }
