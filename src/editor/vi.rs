@@ -2922,7 +2922,7 @@ impl<T: TextDocument + 'static> ViBindings<T> {
 
     fn visual_action_click(&mut self, state: &mut EditorState<T>, text: &mut T, event: &InputEvent) {
         self.leave_visual(state, text);
-        state.click(text, event.mouse_pos);
+        state.click(text, event.cell());
         self.clamp_cursor_to_line_end(state, text);
     }
 
@@ -3161,14 +3161,14 @@ impl<T: TextDocument + 'static> ViBindings<T> {
             }
             chord!(p) => { self.visual_action_paste(state, text); true }
             chord!(LeftClick) if click == 1 => { self.visual_action_click(state, text, &event); true }
-            chord!(LeftClick) if click == 2 => { state.double_click(text, event.mouse_pos); true }
+            chord!(LeftClick) if click == 2 => { state.double_click(text, event.cell()); true }
             chord!(LeftClick) if click == 3 => {
                 self.set_mode(state, ViMode::VisualLine);
-                state.click(text, event.mouse_pos);
+                state.click(text, event.cell());
                 true
             }
-            chord!(LeftDrag) if click == 1 => { state.drag(text, event.mouse_pos); true }
-            chord!(LeftDrag) if click == 2 => { state.double_click_drag(text, event.mouse_pos); true }
+            chord!(LeftDrag) if click == 1 => { state.drag(text, event.cell()); true }
+            chord!(LeftDrag) if click == 2 => { state.double_click_drag(text, event.cell()); true }
             chord!(LeftDrag) if click == 3 => { self.triple_click_drag_visual_line(state, text, &event); true }
             _ => false,
         };
@@ -3226,7 +3226,7 @@ impl<T: TextDocument + 'static> ViBindings<T> {
 
     fn triple_click_drag_visual_line(&mut self, state: &mut EditorState<T>, text: &mut T, event: &InputEvent) {
         self.set_mode(state, ViMode::VisualLine);
-        state.triple_click_drag(text, event.mouse_pos);
+        state.triple_click_drag(text, event.cell());
         if state.cursor > state.anchor {
             state.cursor.prev_grapheme(text);
         } else {
@@ -3237,14 +3237,14 @@ impl<T: TextDocument + 'static> ViBindings<T> {
     fn handle_normal_mouse(&mut self, state: &mut EditorState<T>, text: &mut T, event: &InputEvent) -> bool {
         let click = event.get_click_cycle(3);
         match &event.chord {
-            chord!(LeftClick) if click == 1 => state.click(text, event.mouse_pos),
-            chord!(LeftClick) if click == 2 => state.double_click(text, event.mouse_pos),
+            chord!(LeftClick) if click == 1 => state.click(text, event.cell()),
+            chord!(LeftClick) if click == 2 => state.double_click(text, event.cell()),
             chord!(LeftClick) if click == 3 => {
                 self.set_mode(state, ViMode::VisualLine);
-                state.click(text, event.mouse_pos);
+                state.click(text, event.cell());
             }
-            chord!(LeftDrag) if click == 1 => state.drag(text, event.mouse_pos),
-            chord!(LeftDrag) if click == 2 => state.double_click_drag(text, event.mouse_pos),
+            chord!(LeftDrag) if click == 1 => state.drag(text, event.cell()),
+            chord!(LeftDrag) if click == 2 => state.double_click_drag(text, event.cell()),
             chord!(LeftDrag) if click == 3 => self.triple_click_drag_visual_line(state, text, event),
             _ => return false,
         }

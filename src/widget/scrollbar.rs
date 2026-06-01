@@ -45,6 +45,19 @@ impl ScrollbarThumb {
         self.get_subpixels(axis) > 1
     }
 
+    /// Returns per-axis corner-extension flags and a TTY corner-sharing flag for two-axis scrollbar layout.
+    pub fn corner_extension(&self, both_visible: bool) -> (Vec2<bool>, bool) {
+        let is_gui = crate::runtime::is_gui();
+        let share_corner = both_visible && self.has_half_cell(Axis2D::Y) && !is_gui;
+        let extend_into_corner_gui = both_visible && is_gui;
+        let extend = Axis2D::map(|axis| {
+            share_corner
+                || (extend_into_corner_gui
+                    && (matches!(self, ScrollbarThumb::Border(_)) || self.has_half_cell(axis)))
+        });
+        (extend, share_corner)
+    }
+
     fn glyph(&self, axis: Axis2D, covered: i32, n_levels: i32, leading: bool) -> (char, bool) {
         let full = covered >= n_levels;
         let full_row = n_levels >= self.get_subpixels(axis);
@@ -87,7 +100,7 @@ impl ScrollbarThumb {
     }
 }
 
-/// Per-axis visibility mode applied to a pane's scrollbar.
+/// Per-axis visibility mode applied to a scroll container's scrollbar.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Scrollbar {
     /// Scrolling is enabled, but the bar is never drawn.
@@ -239,6 +252,215 @@ impl ScrollbarState {
         let thumb_bot_sp = ((thumb_top + thumb_height) * sub_px).round() as i32;
         thumb_bot_sp > full_rows * sub_px as i32
     }
+
+    /// Converts whole-cell `scroll` and sub-cell fraction `sub` into a normalized `[0.0, 1.0]` progress.
+    pub fn progress_from_subcell(scroll: u32, sub: f32, max_scroll: u32) -> f32 {
+        if max_scroll == 0 {
+            return 0.0;
+        }
+        ((scroll as f64 + sub as f64) / max_scroll as f64).clamp(0.0, 1.0) as f32
+    }
+
+    /// Splits `progress` back into `(whole cells, sub-cell fraction)` for the given scroll range.
+    pub fn subcell_from_progress(progress: f32, max_scroll: u32) -> (u32, f32) {
+        let p = (progress as f64).clamp(0.0, 1.0);
+        let total = p * max_scroll as f64;
+        let cells = (total as u64).min(max_scroll as u64) as u32;
+        (cells, (total - cells as f64) as f32)
+    }
+
+    /// Draws the scrollbar track and thumb along `axis` over a track length of `view` cells.
+    pub fn render(
+        &self,
+        ctx: &mut RenderContext,
+        axis: Axis2D,
+        view: f32,
+        style: &ScrollbarStyle,
+        leading_anchor: Option<(u32, i32)>,
+    ) {
+        if self.ratio >= 1.0 {
+            return;
+        }
+
+        let resolved = style.get_resolved();
+        let thumb = resolved.thumb;
+        let thumb_style = resolved.thumb_style;
+        let track_style = resolved.track_style;
+        let track_char = resolved.track;
+
+        let n = thumb.get_subpixels(axis);
+        let sub_px = n as f32;
+        let has_half_cell = view.fract() > 0.0;
+        let full_rows = view as u16;
+        let half_n = n / 2;
+        let total_rows = if has_half_cell && half_n > 0 {
+            full_rows + 1
+        } else {
+            full_rows
+        };
+
+        let thumb_top = self.thumb_top(view, sub_px);
+        let thumb_height = self.thumb_height_snapped(view, sub_px);
+        let leading: i32 = leading_anchor.map_or(0, |(_, l)| l);
+        let trailing: i32 = if leading_anchor.is_some() { 1 } else { 0 };
+        let thumb_top_sp = match leading_anchor {
+            Some((whole, lead)) => (whole as i32 + lead) * n,
+            None => (thumb_top * sub_px).round() as i32,
+        };
+        let thumb_bot_sp = thumb_top_sp + (thumb_height * sub_px).round() as i32;
+
+        let move_to = |ctx: &mut RenderContext, i: i32| {
+            if axis == Axis2D::Y {
+                ctx.move_to((0, i).into());
+            } else {
+                ctx.move_to((i, 0).into());
+            }
+        };
+
+        let r_start: i32 = -leading;
+        let r_end: i32 = total_rows as i32 + trailing;
+        for r in r_start..r_end {
+            move_to(ctx, r + leading);
+            let in_pad = r < 0 || r >= total_rows as i32;
+            let n_levels = if !in_pad && r == full_rows as i32 {
+                half_n
+            } else {
+                n
+            };
+            let row_top_sp = (r + leading) * n;
+            let row_bot_sp = row_top_sp + n_levels;
+
+            let cover_top = thumb_top_sp.max(row_top_sp);
+            let cover_bot = thumb_bot_sp.min(row_bot_sp);
+            let covered = (cover_bot - cover_top).max(0);
+
+            if n_levels <= 0 || covered <= 0 {
+                ctx.set_style(track_style);
+                write!(ctx, "{}", track_char);
+            } else {
+                let leading_edge = thumb_top_sp > row_top_sp;
+                let (ch, reversed) = thumb.glyph(axis, covered, n_levels, leading_edge);
+                ctx.set_style(thumb_style.reverse_if(reversed));
+                write!(ctx, "{}", ch);
+            }
+        }
+    }
+
+    /// Renders the scrollbar with sub-cell smooth offset in GUI mode, falling back to whole-cell rendering otherwise.
+    pub fn render_smooth<W, F>(
+        &self,
+        ctx: &mut RenderContext,
+        widget: &W,
+        axis: Axis2D,
+        bar_size: Vec2<u16>,
+        view: f32,
+        style: &ScrollbarStyle,
+        accessor: F,
+    ) where
+        W: Widget + 'static,
+        F: Fn(&W) -> Option<(&ScrollbarStyle, &ScrollbarState)> + 'static,
+    {
+        #[cfg(feature = "gui")]
+        if crate::runtime::is_gui() {
+            if let Some(cell_px) = crate::runtime::get_terminal_info()
+                .and_then(|i| i.cell_px)
+                .map(|c| c[axis])
+                .filter(|&v| v > 1)
+            {
+                let thumb = style.get_resolved_thumb();
+                let thumb_top = self.thumb_top(view, thumb.get_subpixels(axis) as f32);
+                let thumb_top_px = (thumb_top * cell_px as f32).round() as i32;
+                let whole = thumb_top_px.div_euclid(cell_px as i32) as u32;
+                let sub = thumb_top_px.rem_euclid(cell_px as i32);
+                let mut subcell_off = Vec2::of(0i32);
+                subcell_off[axis] = sub;
+                let leading: i32 = if ctx.anchor[axis] + ctx.cursor[axis] >= 1 {
+                    1
+                } else {
+                    0
+                };
+                let mut content_size = bar_size;
+                content_size[axis] = content_size[axis].saturating_add(leading as u16 + 1);
+                let mut content_offset = Vec2::of(0i32);
+                content_offset[axis] = -leading;
+                ctx.queue_offset_region(
+                    widget,
+                    bar_size,
+                    content_size,
+                    content_offset,
+                    subcell_off,
+                    move |this: &W, mut sb_ctx| {
+                        if let Some((style, state)) = accessor(this) {
+                            state.render(
+                                &mut sb_ctx,
+                                axis,
+                                view,
+                                style,
+                                Some((whole, leading)),
+                            );
+                        }
+                    },
+                );
+                return;
+            }
+        }
+        #[cfg(not(feature = "gui"))]
+        {
+            let _ = (widget, accessor);
+        }
+        let mut bar_ctx = ctx.region(bar_size);
+        self.render(&mut bar_ctx, axis, view, style, None);
+    }
+
+    /// Routes a mouse `chord` at `mouse_pos` along the scroll axis to thumb drag and click-jump handling.
+    pub fn handle_input(&mut self, chord: &Chord, mouse_pos: f32, view: f32) -> ScrollbarInputResult {
+        let sub_px = 8.0;
+        match chord {
+            chord!(LeftClick) => {
+                if !self.can_scroll() {
+                    return ScrollbarInputResult::Rejected;
+                }
+                let click_pos = mouse_pos;
+                let thumb_top = self.thumb_top(view, sub_px);
+                let thumb_height = self.thumb_height_snapped(view, sub_px);
+
+                if click_pos >= thumb_top && click_pos < thumb_top + thumb_height {
+                    self.dragging = true;
+                    self.drag_offset = click_pos - thumb_top;
+                    ScrollbarInputResult::Handled(None)
+                } else {
+                    let new_top = click_pos - thumb_height / 2.0;
+                    let new_progress = self.progress_from_pos(new_top, view, sub_px);
+                    self.remap = None;
+                    self.progress = new_progress;
+                    self.dragging = true;
+                    self.drag_offset = thumb_height / 2.0;
+                    tuie::dirty_paint();
+                    ScrollbarInputResult::Handled(Some(new_progress))
+                }
+            }
+            chord!(LeftDrag) => {
+                if !self.dragging {
+                    return ScrollbarInputResult::Rejected;
+                }
+                let new_top = mouse_pos - self.drag_offset;
+                let new_progress = self.progress_from_pos(new_top, view, sub_px);
+                self.remap = None;
+                tuie::dirty_paint();
+                if new_progress != self.progress {
+                    self.progress = new_progress;
+                    ScrollbarInputResult::Handled(Some(new_progress))
+                } else {
+                    ScrollbarInputResult::Handled(None)
+                }
+            }
+            chord!(LeftRelease) => {
+                self.dragging = false;
+                ScrollbarInputResult::Handled(None)
+            }
+            _ => ScrollbarInputResult::Rejected,
+        }
+    }
 }
 
 fn piecewise_remap(progress: f32, anchor_in: f32, anchor_out: f32) -> f32 {
@@ -296,253 +518,10 @@ impl ScrollbarStyle {
     }
 }
 
-/// Draws the scrollbar track and thumb along `axis` over a track length of `view` cells.
-pub fn scrollbar_render(
-    ctx: &mut RenderContext,
-    axis: Axis2D,
-    view: f32,
-    style: &ScrollbarStyle,
-    state: &ScrollbarState,
-    leading_anchor: Option<(u32, i32)>,
-) {
-    if state.ratio >= 1.0 {
-        return;
-    }
-
-    let resolved = style.get_resolved();
-    let thumb = resolved.thumb;
-    let thumb_style = resolved.thumb_style;
-    let track_style = resolved.track_style;
-    let track_char = resolved.track;
-
-    let n = thumb.get_subpixels(axis);
-    let sub_px = n as f32;
-    let has_half_cell = view.fract() > 0.0;
-    let full_rows = view as u16;
-    let half_n = n / 2;
-    let total_rows = if has_half_cell && half_n > 0 {
-        full_rows + 1
-    } else {
-        full_rows
-    };
-
-    let thumb_top = state.thumb_top(view, sub_px);
-    let thumb_height = state.thumb_height_snapped(view, sub_px);
-    let leading: i32 = leading_anchor.map_or(0, |(_, l)| l);
-    let trailing: i32 = if leading_anchor.is_some() { 1 } else { 0 };
-    let thumb_top_sp = match leading_anchor {
-        Some((whole, lead)) => (whole as i32 + lead) * n,
-        None => (thumb_top * sub_px).round() as i32,
-    };
-    let thumb_bot_sp = thumb_top_sp + (thumb_height * sub_px).round() as i32;
-
-    let move_to = |ctx: &mut RenderContext, i: i32| {
-        if axis == Axis2D::Y {
-            ctx.move_to((0, i).into());
-        } else {
-            ctx.move_to((i, 0).into());
-        }
-    };
-
-    let r_start: i32 = -leading;
-    let r_end: i32 = total_rows as i32 + trailing;
-    for r in r_start..r_end {
-        move_to(ctx, r + leading);
-        let in_pad = r < 0 || r >= total_rows as i32;
-        let n_levels = if !in_pad && r == full_rows as i32 {
-            half_n
-        } else {
-            n
-        };
-        let row_top_sp = (r + leading) * n;
-        let row_bot_sp = row_top_sp + n_levels;
-
-        let cover_top = thumb_top_sp.max(row_top_sp);
-        let cover_bot = thumb_bot_sp.min(row_bot_sp);
-        let covered = (cover_bot - cover_top).max(0);
-
-        if n_levels <= 0 || covered <= 0 {
-            ctx.set_style(track_style);
-            write!(ctx, "{}", track_char);
-        } else {
-            let leading_edge = thumb_top_sp > row_top_sp;
-            let (ch, reversed) = thumb.glyph(axis, covered, n_levels, leading_edge);
-            ctx.set_style(thumb_style.reverse_if(reversed));
-            write!(ctx, "{}", ch);
-        }
-    }
-}
-
-/// Renders a scrollbar with sub-cell smooth offset in GUI mode, falling back to whole-cell rendering otherwise.
-pub fn scrollbar_render_smooth<W, F>(
-    ctx: &mut RenderContext,
-    widget: &W,
-    axis: Axis2D,
-    bar_size: Vec2<u16>,
-    view: f32,
-    style: &ScrollbarStyle,
-    state: &ScrollbarState,
-    accessor: F,
-) where
-    W: Widget + 'static,
-    F: Fn(&W) -> Option<(&ScrollbarStyle, &ScrollbarState)> + 'static,
-{
-    #[cfg(feature = "gui")]
-    if crate::runtime::is_gui() {
-        if let Some(cell_px) = crate::runtime::get_terminal_info()
-            .and_then(|info| info.cell_px)
-            .map(|c| c[axis])
-            .filter(|&v| v > 1)
-        {
-            let thumb = style.get_resolved_thumb();
-            let thumb_top = state.thumb_top(view, thumb.get_subpixels(axis) as f32);
-            let thumb_top_px = (thumb_top * cell_px as f32).round() as i32;
-            let whole = thumb_top_px.div_euclid(cell_px as i32) as u32;
-            let sub = thumb_top_px.rem_euclid(cell_px as i32);
-            let mut subcell_off = Vec2::of(0i32);
-            subcell_off[axis] = sub;
-            let leading: i32 = if ctx.anchor[axis] + ctx.cursor[axis] >= 1 {
-                1
-            } else {
-                0
-            };
-            let mut content_size = bar_size;
-            content_size[axis] = content_size[axis].saturating_add(leading as u16 + 1);
-            let mut content_offset = Vec2::of(0i32);
-            content_offset[axis] = -leading;
-            ctx.queue_offset_region(
-                widget,
-                bar_size,
-                content_size,
-                content_offset,
-                subcell_off,
-                move |this: &W, mut sb_ctx| {
-                    if let Some((style, state)) = accessor(this) {
-                        scrollbar_render(
-                            &mut sb_ctx,
-                            axis,
-                            view,
-                            style,
-                            state,
-                            Some((whole, leading)),
-                        );
-                    }
-                },
-            );
-            return;
-        }
-    }
-    #[cfg(not(feature = "gui"))]
-    {
-        let _ = (widget, accessor);
-    }
-    let mut bar_ctx = ctx.region(bar_size);
-    scrollbar_render(&mut bar_ctx, axis, view, style, state, None);
-}
-
-/// Returns per-axis corner-extension flags and a TTY corner-sharing flag for two-axis scrollbar layout.
-pub fn corner_extension(thumb: ScrollbarThumb, both_visible: bool) -> (Vec2<bool>, bool) {
-    let is_gui = crate::runtime::is_gui();
-    let share_corner = both_visible && thumb.has_half_cell(Axis2D::Y) && !is_gui;
-    let extend_into_corner_gui = both_visible && is_gui;
-    let extend = Axis2D::map(|axis| {
-        share_corner
-            || (extend_into_corner_gui
-                && (matches!(thumb, ScrollbarThumb::Border(_)) || thumb.has_half_cell(axis)))
-    });
-    (extend, share_corner)
-}
-
-/// Converts whole-cell `scroll` and sub-cell `sub` px into a normalized `[0.0, 1.0]` progress.
-pub fn progress_from_subcell(scroll: u32, sub: u16, max_scroll: u32, cell_px: u16) -> f32 {
-    let max_px = max_scroll as u64 * cell_px as u64;
-    if max_px == 0 {
-        return 0.0;
-    }
-    let scrolled = scroll as u64 * cell_px as u64 + sub as u64;
-    (scrolled as f64 / max_px as f64).clamp(0.0, 1.0) as f32
-}
-
-/// Splits `progress` back into `(whole cells, sub-cell px)` for the given scroll range.
-pub fn subcell_from_progress(progress: f32, max_scroll: u32, cell_px: u16) -> (u32, u16) {
-    if cell_px == 0 {
-        return (0, 0);
-    }
-    let max_px = max_scroll as u64 * cell_px as u64;
-    let p = (progress as f64).clamp(0.0, 1.0);
-    let total_px = ((p * max_px as f64).round() as u64).min(max_px);
-    let cells = (total_px / cell_px as u64) as u32;
-    let sub = (total_px % cell_px as u64) as u16;
-    (cells, sub)
-}
-
-/// Outcome of feeding an input chord to [`scrollbar_input`].
+/// Outcome of feeding an input chord to [`ScrollbarState::handle_input`].
 pub enum ScrollbarInputResult {
-    /// Chord was consumed.
+    /// Chord was consumed, carrying the new progress when the thumb moved.
     Handled(Option<f32>),
     /// Chord was not relevant to the scrollbar.
     Rejected,
-}
-
-/// Routes a mouse `chord` at `mouse_pos` along the scroll axis to thumb drag and click-jump handling.
-pub fn scrollbar_input(
-    chord: &Chord,
-    mouse_pos: i32,
-    mouse_subpx: i32,
-    cell_px: i32,
-    view: f32,
-    state: &mut ScrollbarState,
-) -> ScrollbarInputResult {
-    let sub_px = 8.0;
-    let frac = if mouse_subpx >= 0 && cell_px > 1 {
-        mouse_subpx as f32 / cell_px as f32
-    } else {
-        0.5
-    };
-    match chord {
-        chord!(LeftClick) => {
-            if !state.can_scroll() {
-                return ScrollbarInputResult::Rejected;
-            }
-            let click_pos = mouse_pos as f32 + frac;
-            let thumb_top = state.thumb_top(view, sub_px);
-            let thumb_height = state.thumb_height_snapped(view, sub_px);
-
-            if click_pos >= thumb_top && click_pos < thumb_top + thumb_height {
-                state.dragging = true;
-                state.drag_offset = click_pos - thumb_top;
-                ScrollbarInputResult::Handled(None)
-            } else {
-                let new_top = click_pos - thumb_height / 2.0;
-                let new_progress = state.progress_from_pos(new_top, view, sub_px);
-                state.remap = None;
-                state.progress = new_progress;
-                state.dragging = true;
-                state.drag_offset = thumb_height / 2.0;
-                tuie::dirty_paint();
-                ScrollbarInputResult::Handled(Some(new_progress))
-            }
-        }
-        chord!(LeftDrag) => {
-            if !state.dragging {
-                return ScrollbarInputResult::Rejected;
-            }
-            let pos = mouse_pos as f32 + frac;
-            let new_top = pos - state.drag_offset;
-            let new_progress = state.progress_from_pos(new_top, view, sub_px);
-            state.remap = None;
-            tuie::dirty_paint();
-            if new_progress != state.progress {
-                state.progress = new_progress;
-                ScrollbarInputResult::Handled(Some(new_progress))
-            } else {
-                ScrollbarInputResult::Handled(None)
-            }
-        }
-        chord!(LeftRelease) => {
-            state.dragging = false;
-            ScrollbarInputResult::Handled(None)
-        }
-        _ => ScrollbarInputResult::Rejected,
-    }
 }

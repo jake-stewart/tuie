@@ -40,13 +40,11 @@ impl RuntimeEvent {
         }
     }
 
-    /// Builds an input event at the given mouse position for triggers like `chord!(LeftClick)`.
+    /// Builds an input event positioned at the center of cell `pos`.
     pub fn input_at(chord: Chord, pos: Vec2<i32>) -> Self {
         RuntimeEvent::Input(InputEvent {
             chord,
-            mouse_pos: pos,
-            mouse_window_pos: pos,
-            mouse_window_subpx: Vec2::of(-1),
+            pos: pos.map(|v| v as f32 + 0.5),
             count: 1,
         })
     }
@@ -62,7 +60,7 @@ impl std::fmt::Display for RuntimeEvent {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Input(event) => {
-                write!(f, "Input({}, {})", event.chord, event.mouse_pos)
+                write!(f, "Input({}, {})", event.chord, event.pos)
             }
             Self::Focus(focused) => write!(f, "Focus({focused})"),
             Self::Resize(size) => write!(f, "Resize({size})"),
@@ -143,11 +141,20 @@ impl RuntimeEventReader {
         self.last_key_time = now;
         RuntimeEvent::Input(InputEvent {
             chord,
-            mouse_pos: self.mouse_pos,
-            mouse_window_pos: self.mouse_pos,
-            mouse_window_subpx: self.mouse_subpx,
+            pos: self.pack_pos(),
             count: self.key_repeat_count,
         })
+    }
+
+    fn pack_pos(&self) -> Vec2<f32> {
+        if self.mouse_pos.x < 0 || self.mouse_pos.y < 0 {
+            return Vec2::of(-1.0);
+        }
+        if self.mouse_subpx.x < 0 {
+            return self.mouse_pos.map(|v| v as f32 + 0.5);
+        }
+        let cell_px = crate::runtime::tree::cell_px();
+        Axis2D::map(|a| self.mouse_pos[a] as f32 + self.mouse_subpx[a] as f32 / cell_px[a] as f32)
     }
 
     fn mouse_event(
@@ -198,9 +205,7 @@ impl RuntimeEventReader {
     ) -> RuntimeEvent {
         RuntimeEvent::Input(InputEvent {
             chord: Chord::new(trigger, modifiers),
-            mouse_pos: self.mouse_pos,
-            mouse_window_pos: self.mouse_pos,
-            mouse_window_subpx: self.mouse_subpx,
+            pos: self.pack_pos(),
             count,
         })
     }

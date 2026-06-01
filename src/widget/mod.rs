@@ -1017,8 +1017,8 @@ pub trait DelegateWidget: 'static {
     }
 
     /// Override hook for [`Widget::subcell_offset`].
-    fn override_subcell_offset(&self, cell: Vec2<i32>) -> Vec2<i32> {
-        self.get_delegate().subcell_offset(cell)
+    fn override_subcell_offset(&self) -> Vec2<f32> {
+        self.get_delegate().subcell_offset()
     }
 
     /// Called after [`Widget::before_layout`] on the delegate.
@@ -1234,8 +1234,8 @@ impl<T: DelegateWidget> Widget for T {
         self.after_before_focus_move(selected_child, axis, direction);
     }
 
-    fn subcell_offset(&self, cell: Vec2<i32>) -> Vec2<i32> {
-        self.override_subcell_offset(cell)
+    fn subcell_offset(&self) -> Vec2<f32> {
+        self.override_subcell_offset()
     }
 }
 
@@ -1527,9 +1527,9 @@ pub trait Widget: std::any::Any {
         _direction: Sign,
     ) {}
 
-    /// Returns the sub-cell pixel offset at `cell`.
-    fn subcell_offset(&self, _cell: Vec2<i32>) -> Vec2<i32> {
-        Vec2::of(0i32)
+    /// Returns the render-time shift of this widget's content in cell fractions.
+    fn subcell_offset(&self) -> Vec2<f32> {
+        Vec2::of(0.0)
     }
 }
 

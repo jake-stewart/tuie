@@ -1272,7 +1272,7 @@ impl Widget for Grid {
         let Some(event) = queue.peek() else { return InputResult::Rejected; };
         match &event.chord {
             chord!(LeftClick) => {
-                let pos = event.mouse_pos;
+                let pos = event.cell();
                 if let Some((axis, boundary, center)) = self.find_divider_at(pos) {
                     let grab_offset = pos[axis] - center;
                     queue.next();
@@ -1284,7 +1284,7 @@ impl Widget for Grid {
             chord!(LeftDrag) => {
                 let Some(drag) = self.drag.take() else { return InputResult::Rejected; };
                 queue.next();
-                let mouse = event.mouse_pos;
+                let mouse = event.cell();
                 if let Some(center) = self.divider_center(drag.axis, drag.boundary) {
                     let delta = mouse[drag.axis] - center - drag.grab_offset;
                     self.apply_drag(drag.axis, drag.boundary, delta);

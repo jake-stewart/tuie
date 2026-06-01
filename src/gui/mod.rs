@@ -299,11 +299,21 @@ impl GuiState {
         };
         self.pending_events.push(RuntimeEvent::Input(InputEvent {
             chord: Chord::new(Trigger::MouseSmoothScroll(dir, delta_cells.abs()), self.modifiers),
-            mouse_pos: self.mouse_cell,
-            mouse_window_pos: self.mouse_cell,
-            mouse_window_subpx: self.mouse_subpx,
+            pos: self.pack_mouse_pos(),
             count: 1,
         }));
+    }
+
+    fn pack_mouse_pos(&self) -> Vec2<f32> {
+        if self.mouse_cell.x < 0 || self.mouse_cell.y < 0 {
+            return Vec2::of(-1.0);
+        }
+        let cell_w = self.font.get_cell_w() as f32;
+        let cell_h = self.font.get_cell_h() as f32;
+        Vec2::new(
+            self.mouse_cell.x as f32 + self.mouse_subpx.x as f32 / cell_w,
+            self.mouse_cell.y as f32 + self.mouse_subpx.y as f32 / cell_h,
+        )
     }
 }
 
@@ -568,9 +578,7 @@ impl ApplicationHandler for GuiState {
                         crate::runtime::dirty_paint();
                         self.pending_events.push(RuntimeEvent::Input(InputEvent {
                             chord,
-                            mouse_pos: self.mouse_cell,
-                            mouse_window_pos: self.mouse_cell,
-                            mouse_window_subpx: self.mouse_subpx,
+                            pos: self.pack_mouse_pos(),
                             count: 1,
                         }));
                     }
@@ -616,9 +624,7 @@ impl ApplicationHandler for GuiState {
                     };
                     self.pending_events.push(RuntimeEvent::Input(InputEvent {
                         chord: Chord::new(trigger, self.modifiers),
-                        mouse_pos: self.mouse_cell,
-                        mouse_window_pos: self.mouse_cell,
-                        mouse_window_subpx: self.mouse_subpx,
+                        pos: self.pack_mouse_pos(),
                         count,
                     }));
                 }
@@ -660,9 +666,7 @@ impl ApplicationHandler for GuiState {
                 };
                 self.pending_events.push(RuntimeEvent::Input(InputEvent {
                     chord: Chord::new(trigger, self.modifiers),
-                    mouse_pos: self.mouse_cell,
-                    mouse_window_pos: self.mouse_cell,
-                    mouse_window_subpx: self.mouse_subpx,
+                    pos: self.pack_mouse_pos(),
                     count: self.click_count,
                 }));
             }

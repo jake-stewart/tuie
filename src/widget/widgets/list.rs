@@ -4,7 +4,6 @@ use crate::prelude::*;
 use crate::widget::chrome::ChromeHost;
 use crate::widget::align::{AlignSpec, FlexAlign, Place};
 use crate::widget::get_flow_output_size_layout;
-use crate::widget::scrollbar::{corner_extension, progress_from_subcell, scrollbar_input, scrollbar_render_smooth};
 use chord_macro::chord;
 use sign::Directional;
 
@@ -40,24 +39,24 @@ struct ListItem {
 }
 
 struct ScrollConfig {
-    main_mode: Option<Scrollbar>,
+    main_mode: Scrollbar,
     cross_mode: Option<Scrollbar>,
     cross_scroll_offset: u32,
     cross_content_size: u16,
     scrollbar: Vec2<ScrollbarState>,
-    subcell_scroll: Vec2<u16>,
+    subcell_scroll: Vec2<f32>,
     style: ScrollbarStyle,
 }
 
 impl ScrollConfig {
     fn new() -> Self {
         Self {
-            main_mode: None,
+            main_mode: Scrollbar::Hidden,
             cross_mode: None,
             cross_scroll_offset: 0,
             cross_content_size: 0,
             scrollbar: Vec2::new(ScrollbarState::new(), ScrollbarState::new()),
-            subcell_scroll: Vec2::of(0),
+            subcell_scroll: Vec2::of(0.0),
             style: ScrollbarStyle::new(),
         }
     }
@@ -183,6 +182,21 @@ impl List {
         })
     }
 
+    fn subcell_offset(&self) -> Vec2<f32> {
+        if !crate::runtime::is_gui() {
+            return Vec2::of(0.0);
+        }
+        Axis2D::map(|a| -self.scroll.subcell_scroll[a])
+    }
+
+    fn main_content_size(&self) -> u32 {
+        if self.len == 0 {
+            return 0;
+        }
+        self.content_offset_of(self.len - 1)
+            + self.item_height_or_estimate(self.len - 1) as u32
+    }
+
     fn max_cross_scroll(&self) -> u32 {
         let viewport_cross = self.get_viewport()[self.orientation.flip()];
         self.scroll.cross_content_size.saturating_sub(viewport_cross) as u32
@@ -299,35 +313,35 @@ impl List {
         (content_pos as i32 - self.anchor.offset).max(0) as u32
     }
 
-    fn anchor_from_content_px(&self, px: u32) -> Anchor {
+    fn anchor_from_scroll(&self, scroll: u32) -> Anchor {
         let step = self.estimated_step();
         if step == 0 {
             return Anchor::zero();
         }
         let window_end = self.window_start + self.items.len();
-        let before_window_px = self.window_start as u32 * step;
+        let before_window = self.window_start as u32 * step;
 
-        if px < before_window_px || self.items.is_empty() {
-            let index = ((px / step) as usize).min(self.len.saturating_sub(1));
+        if scroll < before_window || self.items.is_empty() {
+            let index = ((scroll / step) as usize).min(self.len.saturating_sub(1));
             return Anchor {
                 index,
-                offset: -((px - index as u32 * step) as i32),
+                offset: -((scroll - index as u32 * step) as i32),
             };
         }
 
-        let mut pos = before_window_px;
+        let mut pos = before_window;
         for wi in 0..self.items.len() {
             let h = self.item_height(wi) as u32 + self.gap.size as u32;
-            if pos + h > px {
+            if pos + h > scroll {
                 return Anchor {
                     index: self.window_start + wi,
-                    offset: -((px - pos) as i32),
+                    offset: -((scroll - pos) as i32),
                 };
             }
             pos += h;
         }
 
-        let remaining = px - pos;
+        let remaining = scroll - pos;
         let items_past = (remaining / step) as usize;
         let index = (window_end + items_past).min(self.len.saturating_sub(1));
         Anchor {
@@ -434,9 +448,9 @@ impl List {
 
     fn update_scrollbar_visibility(&mut self) {
         let a = self.orientation;
-        let main_mode = self.scroll.main_mode.unwrap_or(Scrollbar::Hidden);
+        let main_mode = self.scroll.main_mode;
         let cross_mode = self.scroll.cross_mode;
-        let main_total = self.get_content_size();
+        let main_total = self.main_content_size();
         let cross_total = self.scroll.cross_content_size as u32;
 
         let resolve_main = |vp: u32| -> bool {
@@ -585,9 +599,9 @@ impl List {
             }
             ScrollTarget::Progress(progress) => {
                 let progress = progress.clamp(0.0, 1.0);
-                let max_scroll = self.get_content_size()
+                let max_scroll = self.main_content_size()
                     .saturating_sub(self.get_viewport()[self.orientation] as u32);
-                self.anchor = self.anchor_from_content_px((max_scroll as f64 * progress as f64) as u32);
+                self.anchor = self.anchor_from_scroll((max_scroll as f64 * progress as f64) as u32);
             }
         }
     }
@@ -898,7 +912,7 @@ impl Widget for List {
         let cross = self.orientation.flip();
         let border = self.get_border_cells() * 2;
         let pad = self.get_padding_total()[cross];
-        let gutter = match self.scroll.main_mode.unwrap_or(Scrollbar::Hidden) {
+        let gutter = match self.scroll.main_mode {
             Scrollbar::Visible | Scrollbar::AutoHide => 1,
             Scrollbar::Hidden => 0,
         };
@@ -939,7 +953,7 @@ impl Widget for List {
 
         self.clamp_cross_scroll();
         if self.scroll.cross_scroll_offset == self.max_cross_scroll() {
-            self.scroll.subcell_scroll[self.orientation.flip()] = 0;
+            self.scroll.subcell_scroll[self.orientation.flip()] = 0.0;
         }
         self.sync_scrollbars();
         self.flush_events(had_scroll_target && filled);
@@ -1014,14 +1028,16 @@ impl Widget for List {
         }
         ctx.set_style(self.layout.style);
 
-        let subcell = Axis2D::map(|axis| -(self.scroll.subcell_scroll[axis] as i32));
-        let has_subcell = subcell.x != 0 || subcell.y != 0;
+        let fract = self.scroll.subcell_scroll;
+        let has_subcell = crate::runtime::is_gui() && fract != Vec2::of(0.0);
 
         ctx.move_to(chrome_before);
 
         if has_subcell {
             #[cfg(feature = "gui")]
             {
+                let cell_px = crate::runtime::get_terminal_info().and_then(|i| i.cell_px).unwrap_or(Vec2::of(1));
+                let subcell = Axis2D::map(|axis| -((fract[axis] * cell_px[axis] as f32).round() as i32));
                 let mut content_size = viewport;
                 let mut content_offset = Vec2::of(0i32);
                 for axis in [Axis2D::X, Axis2D::Y] {
@@ -1048,7 +1064,7 @@ impl Widget for List {
             drop(vp_ctx);
         }
         let thumb = self.scroll.style.get_resolved_thumb();
-        let (extend, _) = corner_extension(thumb, self.scrollbars_both_visible());
+        let (extend, _) = thumb.corner_extension(self.scrollbars_both_visible());
         for axis in [a, a.flip()] {
             if !self.scroll.scrollbar[axis].is_visible() {
                 continue;
@@ -1074,14 +1090,13 @@ impl Widget for List {
                 - inset_before as f32
                 - inset_after as f32;
 
-            scrollbar_render_smooth(
+            self.scroll.scrollbar[axis].render_smooth(
                 &mut ctx,
                 self,
                 axis,
                 bar_size,
                 size,
                 &self.scroll.style,
-                &self.scroll.scrollbar[axis],
                 move |this: &Self| Some((&this.scroll.style, &this.scroll.scrollbar[axis])),
             );
         }
@@ -1095,7 +1110,8 @@ impl Widget for List {
             chord!(LeftClick) => {
                 let vp_size = self.get_viewport_size();
                 let border = self.get_border_offset();
-                let local = event.mouse_pos - border;
+                let local = event.pos - border.map(|v| v as f32);
+                let local_cell = event.cell() - border;
                 let a = self.orientation;
 
                 let has_both = self.scrollbars_both_visible();
@@ -1112,21 +1128,17 @@ impl Widget for List {
                         0
                     };
                     let along_limit = vp_size[axis] as i32 + corner_extra - inset_after;
-                    let in_gutter = local[cross] >= vp_size[cross] as i32
-                        && local[axis] >= inset_before
-                        && local[axis] < along_limit;
+                    let in_gutter = local_cell[cross] >= vp_size[cross] as i32
+                        && local_cell[axis] >= inset_before
+                        && local_cell[axis] < along_limit;
                     if !in_gutter {
                         continue;
                     }
-                    let cell_px = crate::runtime::cell_px_along(axis) as i32;
                     let size = self.scrollbar_axis_size(axis) - inset_before as f32 - inset_after as f32;
-                    let result = scrollbar_input(
+                    let result = self.scroll.scrollbar[axis].handle_input(
                         &event.chord,
-                        local[axis] - inset_before,
-                        event.mouse_window_subpx[axis],
-                        cell_px,
+                        local[axis] - inset_before as f32,
                         size,
-                        &mut self.scroll.scrollbar[axis],
                     );
                     if let ScrollbarInputResult::Handled(progress) = result {
                         queue.next();
@@ -1141,7 +1153,7 @@ impl Widget for List {
             chord!(LeftDrag) | chord!(LeftRelease) => {
                 let a = self.orientation;
                 let border = self.get_border_offset();
-                let local = event.mouse_pos - border;
+                let local = event.pos - border.map(|v| v as f32);
 
                 for axis in [a, a.flip()] {
                     if !self.scroll.scrollbar[axis].is_dragging() {
@@ -1153,14 +1165,10 @@ impl Widget for List {
                     if !matches!(&event.chord, chord!(LeftRelease)) && size <= 0.0 {
                         continue;
                     }
-                    let cell_px = crate::runtime::cell_px_along(axis) as i32;
-                    let result = scrollbar_input(
+                    let result = self.scroll.scrollbar[axis].handle_input(
                         &event.chord,
-                        local[axis] - inset_before,
-                        event.mouse_window_subpx[axis],
-                        cell_px,
+                        local[axis] - inset_before as f32,
                         size,
-                        &mut self.scroll.scrollbar[axis],
                     );
                     if let ScrollbarInputResult::Handled(progress) = result {
                         queue.next();
@@ -1179,28 +1187,25 @@ impl Widget for List {
                 if a != self.orientation && self.scroll.cross_mode.is_none() {
                     return InputResult::Rejected;
                 }
-                let cell_px = crate::runtime::cell_px_along(a) as i64;
-                let delta_px = (delta * cell_px as f32).round() as i64;
-                if delta_px == 0 {
+                if delta == 0.0 {
                     return InputResult::Rejected;
                 }
                 queue.next();
 
                 if a == self.orientation {
                     let s = direction.screen_sign().relative_to(self.direction);
-                    let signed = delta_px * s.delta() as i64;
-                    let max = self.get_content_size()
-                        .saturating_sub(self.get_viewport()[a] as u32) as i64;
-                    let max_total = max * cell_px;
-                    let cur_total = self.scroll_from_anchor() as i64 * cell_px
-                        + self.scroll.subcell_scroll[a] as i64;
-                    let new_total = (cur_total + signed).clamp(0, max_total);
-                    let new_cells = (new_total / cell_px) as u32;
-                    let new_sub = (new_total % cell_px) as u16;
+                    let signed = delta as f64 * s.delta() as f64;
+                    let max = self.main_content_size()
+                        .saturating_sub(self.get_viewport()[a] as u32) as f64;
+                    let cur_total = self.scroll_from_anchor() as f64
+                        + self.scroll.subcell_scroll[a] as f64;
+                    let new_total = (cur_total + signed).clamp(0.0, max);
+                    let new_cells = new_total as u32;
+                    let new_sub = (new_total - new_cells as f64) as f32;
                     if new_total == cur_total {
                         return InputResult::Handled;
                     }
-                    self.anchor = self.anchor_from_content_px(new_cells);
+                    self.anchor = self.anchor_from_scroll(new_cells);
                     self.scroll.subcell_scroll[a] = new_sub;
                     self.fill();
                     self.sync_scrollbars();
@@ -1209,16 +1214,16 @@ impl Widget for List {
                     return InputResult::Handled;
                 }
 
-                let max_total = self.max_cross_scroll() as i64 * cell_px;
-                let cur_total = self.scroll.cross_scroll_offset as i64 * cell_px
-                    + self.scroll.subcell_scroll[a] as i64;
+                let max_total = self.max_cross_scroll() as f64;
+                let cur_total = self.scroll.cross_scroll_offset as f64
+                    + self.scroll.subcell_scroll[a] as f64;
                 let new_total = if direction.screen_sign() == Sign::Positive {
-                    (cur_total + delta_px).min(max_total)
+                    (cur_total + delta as f64).min(max_total)
                 } else {
-                    (cur_total - delta_px).max(0)
+                    (cur_total - delta as f64).max(0.0)
                 };
-                let new_cross = (new_total / cell_px) as u32;
-                let new_sub = (new_total % cell_px) as u16;
+                let new_cross = new_total as u32;
+                let new_sub = (new_total - new_cross as f64) as f32;
                 let changed = new_cross != self.scroll.cross_scroll_offset
                     || new_sub != self.scroll.subcell_scroll[a];
                 self.scroll.cross_scroll_offset = new_cross;
@@ -1259,7 +1264,7 @@ impl Widget for List {
                 if direction.screen_sign().is_positive() {
                     scroll < max
                 } else {
-                    scroll > 0 || self.scroll.subcell_scroll[a] > 0
+                    scroll > 0 || self.scroll.subcell_scroll[a] > 0.0
                 }
             } else {
                 false
@@ -1269,7 +1274,7 @@ impl Widget for List {
             if scroll_sign.is_positive() {
                 self.can_scroll_forward()
             } else {
-                self.can_scroll_backward() || self.scroll.subcell_scroll[a] > 0
+                self.can_scroll_backward() || self.scroll.subcell_scroll[a] > 0.0
             }
         }
     }
@@ -1402,6 +1407,7 @@ impl Widget for List {
         if !self.viewport_contains(pos) {
             return None;
         }
+        let pos = pos - self.subcell_offset();
         for item in &self.items {
             if !Self::item_contains(&*item.widget, pos) {
                 continue;
@@ -1432,6 +1438,7 @@ impl Widget for List {
         if !self.viewport_contains(pos) {
             return None;
         }
+        let pos = pos - self.subcell_offset();
         for item in &self.items {
             if !Self::item_contains(&*item.widget, pos) {
                 continue;
@@ -1474,24 +1481,6 @@ impl Widget for List {
             }
         }
         None
-    }
-
-    fn subcell_offset(&self, cell: Vec2<i32>) -> Vec2<i32> {
-        if self.scroll.subcell_scroll.x == 0 && self.scroll.subcell_scroll.y == 0 {
-            return Vec2::of(0i32);
-        }
-        let screen = cell + self.layout.rect.pos;
-        let content_pos = self.inner_pos();
-        let viewport = self.get_viewport().map(|v| v as i32);
-        let slack = Axis2D::map(|a| if self.scroll.subcell_scroll[a] > 0 { 1i32 } else { 0 });
-        let in_x = screen.x >= content_pos.x - slack.x
-            && screen.x < content_pos.x + viewport.x + slack.x;
-        let in_y = screen.y >= content_pos.y - slack.y
-            && screen.y < content_pos.y + viewport.y + slack.y;
-        if !(in_x && in_y) {
-            return Vec2::of(0i32);
-        }
-        Axis2D::map(|a| -(self.scroll.subcell_scroll[a] as i32))
     }
 }
 
@@ -1554,7 +1543,7 @@ impl List {
     pub fn set_item_count(&mut self, count: usize) {
         self.len = count;
         self.scroll.cross_content_size = 0;
-        self.scroll.subcell_scroll = Vec2::of(0);
+        self.scroll.subcell_scroll = Vec2::of(0.0);
         if count == 0 {
             self.anchor = Anchor::zero();
         } else if self.anchor.index >= count {
@@ -1573,13 +1562,12 @@ impl List {
         self.get_item_count() == 0
     }
 
-    /// Returns the estimated content size along the main axis in cells.
-    pub fn get_content_size(&self) -> u32 {
-        if self.len == 0 {
-            return 0;
-        }
-        self.content_offset_of(self.len - 1)
-            + self.item_height_or_estimate(self.len - 1) as u32
+    /// Returns the estimated content size in cells.
+    pub fn get_content_size(&self) -> Vec2<u32> {
+        let mut size = Vec2::of(0u32);
+        size[self.orientation] = self.main_content_size();
+        size[self.orientation.flip()] = self.scroll.cross_content_size as u32;
+        size
     }
 
     /// Returns the range of item indices currently intersecting the viewport.
@@ -1642,7 +1630,7 @@ impl List {
         self.scroll_target = ScrollTarget::None;
         self.pending_progress = None;
         self.scroll.cross_content_size = 0;
-        self.scroll.subcell_scroll = Vec2::of(0);
+        self.scroll.subcell_scroll = Vec2::of(0.0);
         self.dirty_layout();
     }
 
@@ -1652,10 +1640,11 @@ impl List {
     }
 
     /// Like [`List::ensure_visible`] but preserves `scrolloff` cells of margin around the item.
-    pub fn ensure_visible_scrolloff(&mut self, index: usize, scrolloff: i32) -> bool {
+    pub fn ensure_visible_scrolloff(&mut self, index: usize, scrolloff: u16) -> bool {
         if index >= self.len {
             return false;
         }
+        let scrolloff = scrolloff as i32;
         let viewport = self.get_viewport()[self.orientation] as i32;
         if viewport == 0 {
             return false;
@@ -1699,7 +1688,7 @@ impl List {
     }
 
     /// Returns the [`WidgetId`] of the cached widget at `index`, if it is materialized.
-    pub fn get_item_widget(&self, index: usize) -> Option<WidgetId> {
+    pub fn get_item_id(&self, index: usize) -> Option<WidgetId> {
         self.data_to_window(index)
             .map(|wi| self.items[wi].widget.get_id())
     }
@@ -1717,7 +1706,6 @@ impl List {
     /// Returns the scroll position on `axis` as a fraction in `[0.0, 1.0]`.
     pub fn get_scroll_progress(&self, axis: Axis2D) -> f32 {
         let viewport = self.get_viewport();
-        let cell_px = crate::runtime::cell_px_along(axis);
         let sub = self.scroll.subcell_scroll[axis];
         if axis == self.orientation {
             if let Some(p) = self.pending_progress {
@@ -1726,10 +1714,10 @@ impl List {
             if self.len <= 1 {
                 return 0.0;
             }
-            let max_scroll = self.get_content_size().saturating_sub(viewport[self.orientation] as u32);
-            progress_from_subcell(self.scroll_from_anchor(), sub, max_scroll, cell_px)
+            let max_scroll = self.main_content_size().saturating_sub(viewport[self.orientation] as u32);
+            ScrollbarState::progress_from_subcell(self.scroll_from_anchor(), sub, max_scroll)
         } else {
-            progress_from_subcell(self.scroll.cross_scroll_offset, sub, self.max_cross_scroll(), cell_px)
+            ScrollbarState::progress_from_subcell(self.scroll.cross_scroll_offset, sub, self.max_cross_scroll())
         }
     }
 
@@ -1757,11 +1745,7 @@ impl List {
     /// Returns the viewport-to-content size ratio on `axis`, clamped to `[0.0, 1.0]`.
     pub fn get_scroll_ratio(&self, axis: Axis2D) -> f32 {
         let vp = self.get_viewport()[axis] as f32;
-        let content = if axis == self.orientation {
-            self.get_content_size() as f32
-        } else {
-            self.scroll.cross_content_size as f32
-        };
+        let content = self.get_content_size()[axis] as f32;
         if content <= 0.0 {
             1.0
         } else {
@@ -1876,10 +1860,9 @@ impl List {
     }
 
     crate::layout_field! {
-        /// Scrollbar mode for the main axis. `None` hides the bar; the main axis
-        /// always scrolls regardless. Stored verbatim so orientation rotation
-        /// preserves per-axis config when the main axis swaps with the cross axis.
-        scroll: Option<Scrollbar> => scroll.main_mode
+        /// Scrollbar mode for the main axis, which always scrolls. Stored
+        /// orientation-relative so rotation keeps the config on the item axis.
+        scroll: Scrollbar => scroll.main_mode
     }
 
     crate::field! {
@@ -1891,7 +1874,7 @@ impl List {
     fn cross_scroll_did_change(&mut self) {
         if self.scroll.cross_mode.is_none() {
             self.scroll.cross_scroll_offset = 0;
-            self.scroll.subcell_scroll[self.orientation.flip()] = 0;
+            self.scroll.subcell_scroll[self.orientation.flip()] = 0.0;
         }
         self.dirty_layout();
     }

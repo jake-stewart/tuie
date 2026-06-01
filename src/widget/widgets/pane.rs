@@ -6,7 +6,6 @@ use crate::widget::align::{AlignSpec, FlexAlign, Place};
 use crate::widget::{get_flow_output_size_layout, get_flow_output_size_measure};
 use crate::util::stack_pool::StackPool;
 use crate::widget::flex::{self, AsFlexItem, FlexItem};
-use crate::widget::scrollbar::{corner_extension, progress_from_subcell, scrollbar_input, scrollbar_render_smooth, subcell_from_progress};
 use chord_macro::chord;
 use sign::Directional;
 
@@ -48,7 +47,7 @@ impl FlexState {
 
 struct ScrollConfig {
     scroll: Vec2<u32>,
-    subcell_scroll: Vec2<u16>,
+    subcell_scroll: Vec2<f32>,
     mode: Vec2<Option<Scrollbar>>,
     scrollbar: Vec2<ScrollbarState>,
     style: ScrollbarStyle,
@@ -58,7 +57,7 @@ impl ScrollConfig {
     fn new() -> Self {
         Self {
             scroll: Vec2::of(0),
-            subcell_scroll: Vec2::of(0),
+            subcell_scroll: Vec2::of(0.0),
             mode: Vec2::of(None),
             scrollbar: Vec2::new(ScrollbarState::new(), ScrollbarState::new()),
             style: ScrollbarStyle::new(),
@@ -280,8 +279,7 @@ impl Pane {
                 1.0
             };
             let max_scroll = content_size.saturating_sub(viewport[a] as u32);
-            let cell_px = crate::runtime::cell_px_along(a);
-            let progress = progress_from_subcell(sc.scroll[a], sc.subcell_scroll[a], max_scroll, cell_px);
+            let progress = ScrollbarState::progress_from_subcell(sc.scroll[a], sc.subcell_scroll[a], max_scroll);
             let bar = &mut sc.scrollbar[a];
             bar.set_ratio(ratio);
             bar.set_progress(progress);
@@ -378,17 +376,26 @@ impl Pane {
         })
     }
 
+    fn subcell_offset(&self) -> Vec2<f32> {
+        if !crate::runtime::is_gui() {
+            return Vec2::of(0.0);
+        }
+        let Some(sc) = self.scroll.as_deref() else {
+            return Vec2::of(0.0);
+        };
+        Axis2D::map(|a| -sc.subcell_scroll[a])
+    }
+
     fn handle_scrollbar_input(
         &mut self,
         chord: &Chord,
-        mouse_pos: Vec2<i32>,
-        mouse_subpx: Vec2<i32>,
+        mouse_pos: Vec2<f32>,
         filter: impl Fn(&ScrollbarState, Axis2D, Vec2<i32>, Vec2<u16>, bool, u16, u16) -> bool,
     ) -> bool {
         let border = self.get_border_offset();
         let viewport = self.get_viewport_size();
-        let local = mouse_pos - border;
-        let cell_px = Axis2D::map(|a| crate::runtime::cell_px_along(a) as i32);
+        let local = mouse_pos - border.map(|v| v as f32);
+        let local_cell = Axis2D::map(|a| local[a].floor() as i32);
         let insets = self.insets;
 
         let mut handled = None;
@@ -397,7 +404,7 @@ impl Pane {
             for a in [Axis2D::X, Axis2D::Y] {
                 let inset_before = insets.get_before(a) as u16;
                 let inset_after = insets.get_after(a) as u16;
-                if !filter(&sc.scrollbar[a], a, local, viewport, has_both, inset_before, inset_after) {
+                if !filter(&sc.scrollbar[a], a, local_cell, viewport, has_both, inset_before, inset_after) {
                     continue;
                 }
                 let base = if a == Axis2D::Y && has_both {
@@ -410,14 +417,10 @@ impl Pane {
                 if !is_release && size <= 0.0 {
                     continue;
                 }
-                let mouse_offset = local[a] - inset_before as i32;
-                let result = scrollbar_input(
+                let result = sc.scrollbar[a].handle_input(
                     chord,
-                    mouse_offset,
-                    mouse_subpx[a],
-                    cell_px[a],
+                    local[a] - inset_before as f32,
                     size,
-                    &mut sc.scrollbar[a],
                 );
                 if let ScrollbarInputResult::Handled(progress) = result {
                     handled = Some((a, progress));
@@ -895,10 +898,6 @@ impl Pane {
         }
     }
 
-    fn is_wrapping(&self) -> bool {
-        self.wrap.is_some()
-    }
-
     fn commit_layout(&mut self, state: &FlexState) {
         for (i, child) in self.children.iter_mut().enumerate() {
             flow_child(&mut **child, state.slots[i].commit);
@@ -1107,16 +1106,18 @@ impl Widget for Pane {
         ctx.move_to(border);
         ctx.set_style(self.layout.style);
 
-        let subcell = self
+        let fract = self
             .scroll
             .as_deref()
-            .map(|sc| Axis2D::map(|a| -(sc.subcell_scroll[a] as i32)))
-            .unwrap_or(Vec2::of(0i32));
-        let has_subcell = subcell.x != 0 || subcell.y != 0;
+            .map(|sc| sc.subcell_scroll)
+            .unwrap_or(Vec2::of(0.0));
+        let has_subcell = crate::runtime::is_gui() && fract != Vec2::of(0.0);
 
         if has_subcell {
             #[cfg(feature = "gui")]
             {
+                let cell_px = crate::runtime::get_terminal_info().and_then(|i| i.cell_px).unwrap_or(Vec2::of(1));
+                let subcell = Axis2D::map(|a| -((fract[a] * cell_px[a] as f32).round() as i32));
                 let a = self.orientation;
                 let cross = a.flip();
                 let mut content_size = viewport;
@@ -1154,7 +1155,7 @@ impl Widget for Pane {
             let thumb = sc.style.get_resolved_thumb();
             let visible = Axis2D::map(|a| sc.scrollbar[a].is_visible());
             let both_visible = visible[Axis2D::X] && visible[Axis2D::Y];
-            let (extend, share_corner) = corner_extension(thumb, both_visible);
+            let (extend, share_corner) = thumb.corner_extension(both_visible);
             let half = Axis2D::map(|a| if extend[a] { 0.5 } else { 0.0 });
             let extra = Axis2D::map(|a| if extend[a] { 1 } else { 0 });
             let gutter = Vec2::new(x_sb_gutter, y_sb_gutter);
@@ -1179,14 +1180,13 @@ impl Widget for Pane {
                 region[axis] = new_len;
                 let size = viewport[axis] as f32 + half[axis] - inset_before as f32 - inset_after as f32;
 
-                scrollbar_render_smooth(
+                sc.scrollbar[axis].render_smooth(
                     &mut ctx,
                     self,
                     axis,
                     region,
                     size,
                     &sc.style,
-                    &sc.scrollbar[axis],
                     move |this: &Self| {
                         let sc = this.scroll.as_ref()?;
                         Some((&sc.style, &sc.scrollbar[axis]))
@@ -1251,7 +1251,7 @@ impl Widget for Pane {
         };
         match &event.chord {
             chord!(LeftClick) => {
-                let result = self.handle_scrollbar_input(&event.chord, event.mouse_pos, event.mouse_window_subpx, |sb, a, local, viewport, has_both, inset_before, inset_after| {
+                let result = self.handle_scrollbar_input(&event.chord, event.pos, |sb, a, local, viewport, has_both, inset_before, inset_after| {
                     if !sb.is_visible() {
                         return false;
                     }
@@ -1276,7 +1276,7 @@ impl Widget for Pane {
                 InputResult::Rejected
             }
             chord!(LeftDrag) | chord!(LeftRelease) => {
-                let result = self.handle_scrollbar_input(&event.chord, event.mouse_pos, event.mouse_window_subpx, |sb, _, _, _, _, _, _| {
+                let result = self.handle_scrollbar_input(&event.chord, event.pos, |sb, _, _, _, _, _, _| {
                     sb.is_dragging()
                 });
                 if result {
@@ -1292,9 +1292,7 @@ impl Widget for Pane {
                 if !self.is_scroll_enabled(a) {
                     return InputResult::Rejected;
                 }
-                let cell_px = crate::runtime::cell_px_along(a);
-                let delta_px: u32 = (delta * cell_px as f32).round() as u32;
-                if delta_px == 0 {
+                if delta == 0.0 {
                     return InputResult::Rejected;
                 }
                 queue.next();
@@ -1302,16 +1300,14 @@ impl Widget for Pane {
                 let sc = self.get_scroll_cfg_mut();
                 let old_scroll = sc.scroll[a];
                 let old_sub = sc.subcell_scroll[a];
-                let cell = cell_px as u32;
-                let cur_total = sc.scroll[a] as u64 * cell as u64 + sc.subcell_scroll[a] as u64;
-                let max_total = max as u64 * cell as u64;
+                let cur_total = sc.scroll[a] as f64 + sc.subcell_scroll[a] as f64;
                 let new_total = if direction.screen_sign() == Sign::Positive {
-                    (cur_total + delta_px as u64).min(max_total)
+                    (cur_total + delta as f64).min(max as f64)
                 } else {
-                    cur_total.saturating_sub(delta_px as u64)
+                    (cur_total - delta as f64).max(0.0)
                 };
-                sc.scroll[a] = (new_total / cell as u64) as u32;
-                sc.subcell_scroll[a] = (new_total % cell as u64) as u16;
+                sc.scroll[a] = (new_total as u64).min(max as u64) as u32;
+                sc.subcell_scroll[a] = (new_total - sc.scroll[a] as f64) as f32;
                 let changed = sc.scroll[a] != old_scroll || sc.subcell_scroll[a] != old_sub;
                 if changed {
                     self.dirty_paint();
@@ -1356,7 +1352,7 @@ impl Widget for Pane {
         if direction.screen_sign() == Sign::Positive {
             sc.scroll[a] < self.get_max_scroll(a)
         } else {
-            sc.scroll[a] > 0 || sc.subcell_scroll[a] > 0
+            sc.scroll[a] > 0 || sc.subcell_scroll[a] > 0.0
         }
     }
 
@@ -1489,8 +1485,7 @@ impl Widget for Pane {
             return None;
         }
 
-        let cell_px = crate::runtime::tree::cell_px();
-        let pos = crate::runtime::tree::apply_subcell_offset(self, pos, cell_px);
+        let pos = pos - self.subcell_offset();
 
         for child in self.children.iter() {
             if Self::child_contains(&**child, pos) {
@@ -1533,8 +1528,7 @@ impl Widget for Pane {
             return None;
         }
 
-        let cell_px = crate::runtime::tree::cell_px();
-        let pos = crate::runtime::tree::apply_subcell_offset(self, pos, cell_px);
+        let pos = pos - self.subcell_offset();
 
         for child in self.children.iter() {
             if Self::child_contains(&**child, pos) {
@@ -1559,28 +1553,6 @@ impl Widget for Pane {
         None
     }
 
-    fn subcell_offset(&self, cell: Vec2<i32>) -> Vec2<i32> {
-        let Some(sc) = self.scroll.as_deref() else {
-            return Vec2::of(0i32);
-        };
-        if sc.subcell_scroll.x == 0 && sc.subcell_scroll.y == 0 {
-            return Vec2::of(0i32);
-        }
-        let screen = cell + self.layout.rect.pos;
-        let border = self.get_border_offset();
-        let content_pos = self.layout.rect.pos + border;
-        let viewport = self.get_viewport_size();
-        let slack = Axis2D::map(|a| if sc.subcell_scroll[a] > 0 { 1i32 } else { 0 });
-        let in_x = screen.x >= content_pos.x - slack.x
-            && screen.x < content_pos.x + viewport.x as i32 + slack.x;
-        let in_y = screen.y >= content_pos.y - slack.y
-            && screen.y < content_pos.y + viewport.y as i32 + slack.y;
-        if !(in_x && in_y) {
-            return Vec2::of(0i32);
-        }
-        Axis2D::map(|a| -(sc.subcell_scroll[a] as i32))
-    }
-
     fn get_cursor(
         &self,
         selected: Option<WidgetId>,
@@ -1588,7 +1560,7 @@ impl Widget for Pane {
         let selected = selected?;
         let smooth = self.scroll.as_deref();
         let extra = Axis2D::map(|a| match smooth {
-            Some(sc) if sc.subcell_scroll[a] == 0 => 0i32,
+            Some(sc) if sc.subcell_scroll[a] == 0.0 => 0i32,
             _ => 1i32,
         });
         for child in self.children.iter() {
@@ -1859,7 +1831,7 @@ impl Pane {
 
     crate::layout_field! {
         /// Whether overflowing children wrap onto a new line.
-        wrap: bool => wrap?
+        wrap as is_wrapping: bool => wrap?
     }
 
     crate::layout_field! {
@@ -1881,6 +1853,18 @@ impl Pane {
     /// Sets the horizontal scrolling mode.
     pub fn x_scroll(mut self: Box<Self>, mode: Scrollbar) -> Box<Self> {
         self.set_x_scroll(Some(mode));
+        self
+    }
+
+    /// Sets the optional vertical scrolling mode.
+    pub fn y_scroll_opt(mut self: Box<Self>, mode: Option<Scrollbar>) -> Box<Self> {
+        self.set_y_scroll(mode);
+        self
+    }
+
+    /// Sets the optional horizontal scrolling mode.
+    pub fn x_scroll_opt(mut self: Box<Self>, mode: Option<Scrollbar>) -> Box<Self> {
+        self.set_x_scroll(mode);
         self
     }
 
@@ -1937,10 +1921,8 @@ impl Pane {
             return 0.0;
         }
         let max = self.get_max_scroll(axis);
-        if max == 0 {
-            return 0.0;
-        }
-        self.get_scroll_cfg().unwrap().scroll[axis] as f32 / max as f32
+        let sc = self.get_scroll_cfg().unwrap();
+        ScrollbarState::progress_from_subcell(sc.scroll[axis], sc.subcell_scroll[axis], max)
     }
 
     /// Sets the scroll position on `axis` from a `[0.0, 1.0]` fraction.
@@ -1949,8 +1931,7 @@ impl Pane {
             return;
         }
         let max = self.get_max_scroll(axis);
-        let cell_px = crate::runtime::cell_px_along(axis);
-        let (new_scroll, new_subcell) = subcell_from_progress(progress, max, cell_px);
+        let (new_scroll, new_subcell) = ScrollbarState::subcell_from_progress(progress, max);
         let sc = self.get_scroll_cfg_mut();
         let changed = new_scroll != sc.scroll[axis]
             || new_subcell != sc.subcell_scroll[axis];
@@ -1991,7 +1972,7 @@ impl Pane {
         } else {
             sc.scroll[a] = sc.scroll[a].saturating_sub((-delta) as u32);
         }
-        sc.subcell_scroll[a] = 0;
+        sc.subcell_scroll[a] = 0.0;
         if sc.scroll[a] != old_scroll || sc.subcell_scroll[a] != old_sub {
             self.dirty_paint();
             self.sync_scrollbars();

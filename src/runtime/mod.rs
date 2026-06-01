@@ -715,9 +715,9 @@ fn make_queue(events: &[InputEvent], flushing: bool, unhandled: bool) -> InputQu
 }
 
 fn dispatch_input(target: &mut dyn Widget, key_queue: &mut [InputEvent], flushing: bool, unhandled: bool) -> (InputResult, usize) {
-    let content_pos = target.get_pos();
+    let content_pos = target.get_pos().map(|v| v as f32);
     for event in key_queue.iter_mut() {
-        event.mouse_pos = event.mouse_window_pos - content_pos;
+        event.pos = event.pos - content_pos;
     }
     let mut queue = make_queue(key_queue, flushing, unhandled);
     let result = target.on_input(&mut queue);
@@ -1136,8 +1136,8 @@ struct Runtime {
     last_scroll: std::time::Instant,
     scroll_held: bool,
     scroll_accum: Vec2<f32>,
-    scroll_pos: Vec2<i32>,
-    mouse_pos: Vec2<i32>,
+    scroll_pos: Vec2<f32>,
+    mouse_pos: Vec2<f32>,
     cursor_visible: bool,
     buf: String,
     dragging: bool,
@@ -1225,8 +1225,8 @@ impl Runtime {
             last_scroll: std::time::Instant::now(),
             scroll_held: false,
             scroll_accum: Vec2::new(0.0, 0.0),
-            scroll_pos: Vec2::of(-1),
-            mouse_pos: Vec2::of(-1),
+            scroll_pos: Vec2::of(-1.0),
+            mouse_pos: Vec2::of(-1.0),
 
             focus_chain: Vec::new(),
             curswant: Vec2::of(0i32),
@@ -1608,31 +1608,32 @@ impl Runtime {
     fn handle_hover(
         &mut self,
         root: &mut dyn Widget,
-        mouse_pos: Vec2<i32>,
-        mouse_subpx: Vec2<i32>,
+        pos: Vec2<f32>,
         release: bool,
     ) {
-        let cell_px = crate::runtime::tree::cell_px();
-        let pos_f = crate::runtime::tree::pos_with_subpx(mouse_pos, mouse_subpx, cell_px);
         let mut new_path: Vec<WidgetId> = vec![];
-        let new_id = match self.popup_hit_test(mouse_pos) {
-            PopupHitResult::Hit(i) => {
-                let id = self.popups[i].content.descendant_at_pos(pos_f, Some(&mut new_path));
-                if id.is_some() {
-                    new_path.push(self.popups[i].content.get_id());
-                    new_path.reverse();
+        let new_id = if pos.x < 0.0 {
+            None
+        } else {
+            let cell = pos.map(|v| v.floor() as i32);
+            match self.popup_hit_test(cell) {
+                PopupHitResult::Hit(i) => {
+                    let id = self.popups[i].content.descendant_at_pos(pos, Some(&mut new_path));
+                    if id.is_some() {
+                        new_path.push(self.popups[i].content.get_id());
+                        new_path.reverse();
+                    }
+                    id
                 }
-                id
-            }
-            PopupHitResult::Blocked => None,
-            PopupHitResult::Miss => {
-                let mut _shifts: Vec<Vec2<i32>> = Vec::new();
-                let hit = hit_test_z(root, pos_f, &mut new_path, &mut _shifts, &[]);
-                if hit.is_some() {
-                    new_path.push(root.get_id());
-                    new_path.reverse();
+                PopupHitResult::Blocked => None,
+                PopupHitResult::Miss => {
+                    let hit = hit_test_z(root, pos, &mut new_path, &[]);
+                    if hit.is_some() {
+                        new_path.push(root.get_id());
+                        new_path.reverse();
+                    }
+                    hit.map(|(id, _z)| id)
                 }
-                hit.map(|(id, _z)| id)
             }
         };
 
@@ -1925,11 +1926,11 @@ impl Runtime {
             RuntimeEvent::Focus(focused) => {
                 if !focused {
                     self.clear_key_queue();
-                    self.handle_hover(root, Vec2::of(-1), Vec2::of(-1), false);
+                    self.handle_hover(root, Vec2::of(-1.0), false);
                 }
             }
             RuntimeEvent::Input(mut event) => {
-                self.mouse_pos = event.mouse_pos;
+                self.mouse_pos = event.pos;
                 if event.is_mouse_event() {
                     let mut early_exit = false;
                     match &event.chord.trigger {
@@ -1961,10 +1962,10 @@ impl Runtime {
                                 self.process_focus_request(root, select_id, false);
                             }
 
-                            self.handle_hover(root, event.mouse_pos, event.mouse_window_subpx, true);
+                            self.handle_hover(root, event.pos, true);
                         }
                         Trigger::MouseHover => {
-                            self.handle_hover(root, event.mouse_pos, event.mouse_window_subpx, false);
+                            self.handle_hover(root, event.pos, false);
                             if !self.mouse_path.is_empty() {
                                 let path = self.mouse_path.clone();
                                 self.dispatch_mouse(root, &path, &mut event);
@@ -1999,9 +2000,7 @@ impl Runtime {
                                     );
                                     let mut synth = InputEvent {
                                         chord: Chord::new(Trigger::MouseScroll(synth_dir), event.chord.modifiers),
-                                        mouse_pos: event.mouse_window_pos,
-                                        mouse_window_pos: event.mouse_window_pos,
-                                        mouse_window_subpx: event.mouse_window_subpx,
+                                        pos: event.pos,
                                         count: 1,
                                     };
                                     if self.handle_popup_scroll(root, &mut synth, synth_dir).is_none() {
@@ -2035,9 +2034,7 @@ impl Runtime {
             RuntimeEvent::Paste(s) => {
                 let event = InputEvent {
                     chord: Chord::new(Trigger::Paste(s), Modifiers::new()),
-                    mouse_pos: self.mouse_pos,
-                    mouse_window_pos: self.mouse_pos,
-                    mouse_window_subpx: Vec2::of(-1),
+                    pos: self.mouse_pos,
                     count: 1,
                 };
                 self.enqueue_keyboard(event);
@@ -2074,8 +2071,8 @@ impl Runtime {
     fn dispatch_click(&mut self, root: &mut dyn Widget, popup_index: Option<usize>, event: &mut InputEvent, selectable: bool) {
         self.dragging = true;
         self.scroll_path.clear();
+        let window_pos = event.pos;
         let mut click_path: Vec<WidgetId> = vec![];
-        let mut click_shifts: Vec<Vec2<i32>> = vec![];
         let mut consumed_idx: Option<usize> = None;
         let mut excluded: Vec<WidgetId> = vec![];
 
@@ -2083,51 +2080,41 @@ impl Runtime {
             let mut found_hit = false;
             let mut hit_z: Option<Layer> = None;
             click_path.clear();
-            click_shifts.clear();
             {
                 let click_root: &dyn Widget = match popup_index {
                     Some(i) => &*self.popups[i].content,
                     None => root as &dyn Widget,
                 };
-                let cell_px = crate::runtime::tree::cell_px();
-                let pos_f = crate::runtime::tree::pos_with_subpx(
-                    event.mouse_pos, event.mouse_window_subpx, cell_px,
-                );
                 match popup_index {
                     Some(_) => {
                         if click_root.descendant_at_pos(
-                            pos_f,
+                            window_pos,
                             Some(&mut click_path),
                         ).is_some() {
                             found_hit = true;
                         }
                     }
                     None => {
-                        if let Some((_, z)) = hit_test_z(click_root, pos_f, &mut click_path, &mut click_shifts, &excluded) {
+                        if let Some((_, z)) = hit_test_z(click_root, window_pos, &mut click_path, &excluded) {
                             hit_z = Some(z);
                             found_hit = true;
                         }
                     }
                 }
                 click_path.push(click_root.get_id());
-                click_shifts.push(Vec2::of(0i32));
             }
             click_path.reverse();
-            click_shifts.reverse();
 
-            let original_subpx = event.mouse_window_subpx;
             for i in (0..click_path.len()).rev() {
                 let click_root: &mut dyn Widget = match popup_index {
                     Some(pi) => &mut *self.popups[pi].content,
                     None => root,
                 };
-                let shift = click_shifts.get(i).copied().unwrap_or_else(|| Vec2::of(0i32));
-                let (_, leaf_subpx) = crate::runtime::tree::window_to_leaf(
-                    &*click_root, &click_path[..=i], event.mouse_window_pos, original_subpx,
+                let leaf_pos = crate::runtime::tree::window_to_leaf(
+                    &*click_root, &click_path[..=i], window_pos,
                 );
                 let result = if let Some(target) = walk_path_mut(click_root, &click_path[..=i]) {
-                    event.mouse_pos = event.mouse_window_pos + shift - target.get_pos();
-                    event.mouse_window_subpx = leaf_subpx;
+                    event.pos = leaf_pos - target.get_pos().map(|v| v as f32);
                     let mut queue = InputQueue::new(std::slice::from_ref(&*event), false);
                     target.on_input(&mut queue)
                 } else {
@@ -2139,6 +2126,7 @@ impl Runtime {
                     break;
                 }
             }
+            event.pos = window_pos;
 
             if consumed_idx.is_some() {
                 break;
@@ -2175,7 +2163,7 @@ impl Runtime {
                     Some(i) => &*self.popups[i].content,
                     None => root as &dyn Widget,
                 };
-                Self::click_inside_widget_border(click_root, select_id, event.mouse_window_pos)
+                Self::click_inside_widget_border(click_root, select_id, window_pos.map(|v| v.floor() as i32))
             };
             self.process_focus_request(root, select_id, active);
         } else {
@@ -2186,7 +2174,7 @@ impl Runtime {
             let mut found = false;
             for &wid in click_path.iter().rev() {
                 if let Some(resolved_id) = click_root.find(wid).and_then(|w| w.get_focus_target()) {
-                    let active = Self::click_inside_widget_border(click_root, resolved_id, event.mouse_window_pos);
+                    let active = Self::click_inside_widget_border(click_root, resolved_id, window_pos.map(|v| v.floor() as i32));
                     self.process_focus_request(root, resolved_id, active);
                     found = true;
                     break;
@@ -2213,7 +2201,7 @@ impl Runtime {
 
         let now = std::time::Instant::now();
         let elapsed = now.duration_since(self.last_scroll);
-        let near_prev = event.mouse_pos.diff(self.scroll_pos).all_le(Vec2::new(2, 1));
+        let near_prev = event.pos.diff(self.scroll_pos).all_le(Vec2::new(2.0_f32, 1.0_f32));
 
         if near_prev {
             if let Some(&scroll_wid) = self.scroll_path.last() {
@@ -2234,12 +2222,8 @@ impl Runtime {
             }
         }
 
-        self.scroll_pos = event.mouse_pos;
-        let cell_px = crate::runtime::tree::cell_px();
-        let pos_f = crate::runtime::tree::pos_with_subpx(
-            event.mouse_pos, event.mouse_window_subpx, cell_px,
-        );
-        self.scroll_path = build_scroll_path(root, pos_f, direction);
+        self.scroll_pos = event.pos;
+        self.scroll_path = build_scroll_path(root, event.pos, direction);
         if !self.scroll_path.is_empty() {
             let path = self.scroll_path.clone();
             let result = self.dispatch_mouse(root, &path, event);
@@ -2254,19 +2238,18 @@ impl Runtime {
         if path.is_empty() {
             return InputResult::Rejected;
         }
+        let window_pos = event.pos;
         let dispatch_root = self.find_root_for_path_mut(root, path);
-        let (leaf_cell, leaf_subpx) = crate::runtime::tree::window_to_leaf(
-            &*dispatch_root, path, event.mouse_window_pos, event.mouse_window_subpx,
-        );
-        event.mouse_window_subpx = leaf_subpx;
+        let leaf_pos = crate::runtime::tree::window_to_leaf(&*dispatch_root, path, window_pos);
         let result = match walk_path_mut(dispatch_root, path) {
             Some(target) => {
-                event.mouse_pos = leaf_cell - target.get_pos();
+                event.pos = leaf_pos - target.get_pos().map(|v| v as f32);
                 let mut queue = InputQueue::new(std::slice::from_ref(&*event), false);
                 target.on_input(&mut queue)
             }
             None => InputResult::Rejected,
         };
+        event.pos = window_pos;
         self.flush_events(root);
         result
     }
@@ -2396,8 +2379,8 @@ impl Runtime {
         }
 
         if !self.is_focus_chain_valid(&*root) {
-            let target = if self.mouse_pos.x >= 0 {
-                self.mouse_pos
+            let target = if self.mouse_pos.x >= 0.0 {
+                self.mouse_pos.map(|v| v.floor() as i32)
             } else if let Some(selected_id) = self.focused_widget_id() {
                 rect_center(widget_rect_or_zero(self.get_active_root(&*root), selected_id))
             } else {
@@ -2512,7 +2495,7 @@ impl Runtime {
         }
 
         if !self.dragging {
-            self.handle_hover(root, self.mouse_pos, Vec2::of(-1), false);
+            self.handle_hover(root, self.mouse_pos, false);
         }
 
         let cursor = self.compute_cursor(root, terminal_size);
@@ -2523,7 +2506,7 @@ impl Runtime {
     #[cfg(feature = "gui")]
     fn present_gui(&mut self, root: &dyn Widget, cursor: Option<(CursorShape, Vec2<i32>)>) {
         let cursor_subpixel = match cursor {
-            Some((_, pos)) => path_subcell_offset(root, &self.focus_chain, pos),
+            Some(_) => path_subcell_offset(root, &self.focus_chain),
             None => Vec2::of(0i32),
         };
         let renderer = &mut self.renderer;
@@ -2706,13 +2689,9 @@ impl Runtime {
         if self.popups.is_empty() {
             return None;
         }
-        match self.popup_hit_test(event.mouse_pos) {
+        match self.popup_hit_test(event.cell()) {
             PopupHitResult::Hit(i) => {
-                let cell_px = crate::runtime::tree::cell_px();
-                let pos_f = crate::runtime::tree::pos_with_subpx(
-                    event.mouse_pos, event.mouse_window_subpx, cell_px,
-                );
-                let path = build_scroll_path(&*self.popups[i].content, pos_f, direction);
+                let path = build_scroll_path(&*self.popups[i].content, event.pos, direction);
                 let result = if !path.is_empty() {
                     self.dispatch_mouse(root, &path, event)
                 } else {
@@ -2730,7 +2709,7 @@ impl Runtime {
             return false;
         }
 
-        if let PopupHitResult::Hit(i) = self.popup_hit_test(event.mouse_pos) {
+        if let PopupHitResult::Hit(i) = self.popup_hit_test(event.cell()) {
             self.dispatch_click(root, Some(i), event, true);
             self.drain_popup_queues(root);
             return true;

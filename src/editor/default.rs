@@ -13,23 +13,23 @@ pub(crate) fn on_input_shared<T: TextDocument>(
     match &event.chord {
         chord!(LeftClick) if click == 1 => {
             let pos = if state.inclusive_selection {
-                event.mouse_pos
+                event.cell()
             } else {
                 ibeam_click_pos(event)
             };
             state.click(text, pos);
         }
-        chord!(LeftClick) if click == 2 => state.double_click(text, event.mouse_pos),
-        chord!(LeftClick) if click == 3 => state.triple_click(text, event.mouse_pos),
+        chord!(LeftClick) if click == 2 => state.double_click(text, event.cell()),
+        chord!(LeftClick) if click == 3 => state.triple_click(text, event.cell()),
         chord!(LeftDrag) if click == 1 => {
-            if !state.inclusive_selection && event.mouse_window_subpx.x >= 0 {
+            if !state.inclusive_selection && crate::get_terminal_info().map(|i| i.mouse_pixel_capture).unwrap_or(false) {
                 state.drag_ibeam(text, ibeam_click_pos(event));
             } else {
-                state.drag(text, event.mouse_pos);
+                state.drag(text, event.cell());
             }
         }
-        chord!(LeftDrag) if click == 2 => state.double_click_drag(text, event.mouse_pos),
-        chord!(LeftDrag) if click == 3 => state.triple_click_drag(text, event.mouse_pos),
+        chord!(LeftDrag) if click == 2 => state.double_click_drag(text, event.cell()),
+        chord!(LeftDrag) if click == 3 => state.triple_click_drag(text, event.cell()),
         chord!(Arrow(direction)) => state.move_cursor(text, *direction),
         chord!(Shift + Arrow(direction)) => state.extend_selection(text, *direction),
         chord!(Ctrl + Arrow(direction) | Alt + Arrow(direction)) => {

@@ -2810,7 +2810,7 @@ impl Widget for Split {
         let Some(event) = queue.peek() else { return InputResult::Rejected; };
         match &event.chord {
             chord!(LeftClick) => {
-                let mouse = event.mouse_pos;
+                let mouse = event.cell();
                 let mouse_vec = Vec2::new(mouse.x as i32, mouse.y as i32);
 
                 let inner_offset = self.inner_offset();
@@ -2874,7 +2874,7 @@ impl Widget for Split {
                         ) else {
                             continue;
                         };
-                        let delta = event.mouse_pos[a] as i32
+                        let delta = event.cell()[a] as i32
                             - div_pos
                             - dd.grab_offset;
                         if delta != 0 {

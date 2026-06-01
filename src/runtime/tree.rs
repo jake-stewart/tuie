@@ -2,17 +2,6 @@
 
 use crate::prelude::*;
 
-pub(crate) fn pos_with_subpx(cell: Vec2<i32>, subpx: Vec2<i32>, cell_px: Vec2<i32>) -> Vec2<f32> {
-    Axis2D::map(|a| {
-        let frac_px = if subpx[a] < 0 {
-            cell_px[a] / 2
-        } else {
-            subpx[a]
-        };
-        cell[a] as f32 + frac_px as f32 / cell_px[a] as f32
-    })
-}
-
 pub(crate) fn rect_contains_f32(rect: Rect<i32, u16>, pos: Vec2<f32>) -> bool {
     Axis2D::all(|a| {
         pos[a] >= rect.pos[a] as f32
@@ -38,45 +27,14 @@ pub(crate) fn cell_px() -> Vec2<i32> {
     Vec2::of(1i32)
 }
 
-pub(crate) fn apply_subcell_offset(
-    widget: &dyn Widget,
-    pos: Vec2<f32>,
-    cell_px: Vec2<i32>,
-) -> Vec2<f32> {
-    let widget_pos = widget.get_pos();
-    let local_cell = Axis2D::map(|a| (pos[a] - widget_pos[a] as f32).floor() as i32);
-    let offset_px = widget.subcell_offset(local_cell);
-    if offset_px.x == 0 && offset_px.y == 0 {
-        return pos;
-    }
-    Axis2D::map(|a| pos[a] - offset_px[a] as f32 / cell_px[a] as f32)
-}
-
 pub(crate) fn hit_test_z(
     widget: &dyn Widget,
     pos: Vec2<f32>,
     path: &mut Vec<WidgetId>,
-    shifts: &mut Vec<Vec2<i32>>,
     excluded: &[WidgetId],
 ) -> Option<(WidgetId, Layer)> {
-    let cell_px = cell_px();
-    hit_test_z_inner(widget, pos, cell_px, Vec2::of(0i32), path, shifts, excluded)
-}
-
-fn hit_test_z_inner(
-    widget: &dyn Widget,
-    pos: Vec2<f32>,
-    cell_px: Vec2<i32>,
-    cumul_shift: Vec2<i32>,
-    path: &mut Vec<WidgetId>,
-    shifts: &mut Vec<Vec2<i32>>,
-    excluded: &[WidgetId],
-) -> Option<(WidgetId, Layer)> {
-    let new_pos = apply_subcell_offset(widget, pos, cell_px);
-    let cell_delta = Axis2D::map(|a| (new_pos[a].floor() as i32) - (pos[a].floor() as i32));
-    let widget_shift = cumul_shift + cell_delta;
-    let pos = new_pos;
-    let mut best: Option<(WidgetId, Layer, Vec<WidgetId>, Vec<Vec2<i32>>)> = None;
+    let pos = pos - widget.subcell_offset();
+    let mut best: Option<(WidgetId, Layer, Vec<WidgetId>)> = None;
     widget.each_child(
         &mut |child| {
             let z = child.get_layer();
@@ -86,39 +44,28 @@ fn hit_test_z_inner(
                 return;
             }
             let mut sub_path: Vec<WidgetId> = Vec::new();
-            let mut sub_shifts: Vec<Vec2<i32>> = Vec::new();
-            let child_hit = hit_test_z_inner(
-                child, pos, cell_px, widget_shift,
-                &mut sub_path, &mut sub_shifts, excluded,
-            );
+            let child_hit = hit_test_z(child, pos, &mut sub_path, excluded);
             let (leaf_id, leaf_z) = match child_hit {
                 Some((id, hit_z)) => {
                     sub_path.push(child.get_id());
-                    sub_shifts.push(widget_shift);
                     (id, hit_z.max(z))
                 }
                 None => {
-                    if !in_rect {
-                        return;
-                    }
-                    if excluded.contains(&child.get_id()) {
+                    if !in_rect || excluded.contains(&child.get_id()) {
                         return;
                     }
                     sub_path.push(child.get_id());
-                    sub_shifts.push(widget_shift);
                     (child.get_id(), z)
                 }
             };
-            let wins = best.as_ref().map_or(true, |(_, b_z, _, _)| leaf_z > *b_z);
-            if wins {
-                best = Some((leaf_id, leaf_z, sub_path, sub_shifts));
+            if best.as_ref().map_or(true, |(_, b_z, _)| leaf_z > *b_z) {
+                best = Some((leaf_id, leaf_z, sub_path));
             }
         },
         Sign::Negative,
     );
-    best.map(|(id, z, sub_path, sub_shifts)| {
+    best.map(|(id, z, sub_path)| {
         path.extend(sub_path);
-        shifts.extend(sub_shifts);
         (id, z)
     })
 }
@@ -127,59 +74,37 @@ fn hit_test_z_inner(
 pub(crate) fn path_subcell_offset(
     root: &dyn Widget,
     path: &[WidgetId],
-    target_abs: Vec2<i32>,
 ) -> Vec2<i32> {
-    let mut total = Vec2::of(0i32);
     if path.is_empty() || root.get_id() != path[0] {
-        return total;
+        return Vec2::of(0i32);
     }
-    fn recurse(
-        widget: &dyn Widget,
-        path: &[WidgetId],
-        idx: usize,
-        target_abs: Vec2<i32>,
-        total: &mut Vec2<i32>,
-    ) {
-        let local = target_abs - widget.get_pos();
-        *total = *total + widget.subcell_offset(local);
-        if idx + 1 >= path.len() {
-            return;
-        }
-        let next_id = path[idx + 1];
-        widget.each_child(
-            &mut |child| {
-                if child.get_id() != next_id {
-                    return;
-                }
-                recurse(child, path, idx + 1, target_abs, total);
-            },
-            Sign::Positive,
-        );
+    let mut total = root.subcell_offset();
+    let mut current: &dyn Widget = root;
+    for &next_id in &path[1..] {
+        let Some(c) = current.get_child(next_id) else { break };
+        current = c;
+        total = total + current.subcell_offset();
     }
-    recurse(root, path, 0, target_abs, &mut total);
-    total
+    let cp = cell_px();
+    Axis2D::map(|a| (total[a] * cp[a] as f32).round() as i32)
 }
 
+/// Walks `path` from `root` applying each ancestor's render-time shift to `window_pos`,
+/// yielding the post-shift window-frame position. Callers subtract `target.get_pos()` to
+/// get the leaf-local coordinate.
 pub(crate) fn window_to_leaf(
     root: &dyn Widget,
     path: &[WidgetId],
-    window_pos: Vec2<i32>,
-    window_subpx: Vec2<i32>,
-) -> (Vec2<i32>, Vec2<i32>) {
-    let cell_px = cell_px();
-    let mut pos = pos_with_subpx(window_pos, window_subpx, cell_px);
+    window_pos: Vec2<f32>,
+) -> Vec2<f32> {
+    let mut pos = window_pos;
     let mut current: &dyn Widget = root;
     for &next_id in &path[1..] {
-        pos = apply_subcell_offset(current, pos, cell_px);
+        pos = pos - current.subcell_offset();
         let Some(c) = current.get_child(next_id) else { break };
         current = c;
     }
-    let cell = Axis2D::map(|a| pos[a].floor() as i32);
-    let subpx = Axis2D::map(|a| if window_subpx[a] < 0 { -1 } else {
-        (((pos[a] - cell[a] as f32) * cell_px[a] as f32).round() as i32)
-            .clamp(0, cell_px[a] - 1)
-    });
-    (cell, subpx)
+    pos
 }
 
 pub(crate) fn build_scroll_path(

@@ -5,17 +5,11 @@ use chord_macro::chord;
 use std::any::Any;
 
 pub(crate) fn ibeam_click_pos(event: &InputEvent) -> Vec2<i32> {
-    let mut pos = event.mouse_pos;
-    if event.mouse_window_subpx.x >= 0 {
-        let cell_w = crate::get_terminal_info()
-            .and_then(|i| i.cell_px)
-            .map(|c| c.x as i32)
-            .unwrap_or(1);
-        if event.mouse_window_subpx.x >= cell_w / 2 {
-            pos.x += 1;
-        }
+    let mut cell = event.cell();
+    if crate::get_terminal_info().map(|i| i.mouse_pixel_capture).unwrap_or(false) && event.pos.x.fract() > 0.5 {
+        cell.x += 1;
     }
-    pos
+    cell
 }
 
 /// Translates input chords into edits on an [`EditorState`].
