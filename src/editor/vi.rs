@@ -3486,7 +3486,7 @@ impl<T: TextDocument + 'static> ViBindings<T> {
                     self.set_mode(state, ViMode::Normal);
                 }
                 tuie::dirty_paint();
-                let consumed_events = &queue.get_all()[..queue.get_consumed()];
+                let consumed_events = &queue.get_all()[..queue.get_consumed_count()];
                 if !self.replaying()
                     && Self::is_normal_command_repeatable(consumed_events)
                 {

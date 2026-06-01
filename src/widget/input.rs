@@ -141,7 +141,7 @@ impl<'a> InputQueue<'a> {
     }
 
     /// Returns the number of events consumed so far.
-    pub fn get_consumed(&self) -> usize {
+    pub fn get_consumed_count(&self) -> usize {
         self.pos
     }
 

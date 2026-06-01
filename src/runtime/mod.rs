@@ -722,7 +722,7 @@ fn dispatch_input(target: &mut dyn Widget, key_queue: &mut [InputEvent], flushin
     }
     let mut queue = make_queue(key_queue, flushing, unhandled);
     let result = target.on_input(&mut queue);
-    (result, queue.get_consumed())
+    (result, queue.get_consumed_count())
 }
 
 fn process_keys_interleaved(root: &mut dyn Widget) {
