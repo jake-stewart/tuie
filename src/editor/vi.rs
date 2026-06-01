@@ -1840,9 +1840,10 @@ impl<T: TextDocument + 'static> ViBindings<T> {
     fn motion_word_end(&mut self, state: &mut EditorState<T>, text: &mut T, count: usize, sign: Sign, big: bool) {
         for _ in 0..count {
             if sign.is_positive() {
-                if !state.cursor.cursor_step(text, Sign::Positive) {
+                if state.cursor.at_eof(text) {
                     return;
                 }
+                state.cursor.move_grapheme(text, Sign::Positive);
                 state.cursor.skip_whitespace(text, Sign::Positive);
                 let moved = if big {
                     self.skip_big_word(state, text, Sign::Positive)

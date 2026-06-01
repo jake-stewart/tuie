@@ -231,11 +231,6 @@ pub trait CursorMethods: Cursor {
         }
     }
 
-    /// Moves the cursor one grapheme in `sign`, returning whether it moved.
-    fn cursor_step(&mut self, text: &Self::Text, sign: Sign) -> bool {
-        self.clone() != *self.move_grapheme(text, sign)
-    }
-
     /// Moves the cursor one word in `sign`.
     fn move_word(&mut self, text: &Self::Text, sign: Sign) {
         self.skip_whitespace(text, sign);
