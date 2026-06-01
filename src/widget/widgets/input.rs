@@ -54,7 +54,7 @@ impl Input {
 
     fn update_highlight(&mut self) {
         self.text.clear_highlight();
-        let range = self.editor.get_highlight_range(&*self.text);
+        let range = self.editor.get_selected_range(&*self.text);
         if !range.is_empty() {
             let style = self.selected_style.unwrap_or_else(|| config::get().highlight_style);
             self.text.highlight(range, style);
@@ -138,7 +138,7 @@ impl DelegateWidget for Input {
         if selected.is_some() {
             return None;
         }
-        let cursor_idx = self.editor.get_cursor_pos(&*self.text);
+        let cursor_idx = self.editor.get_cursor_index(&*self.text);
         let pos = self.text.index_to_virtual_pos(cursor_idx, self.editor.get_wrap_bias());
         Some((self.editor.get_cursor_shape(), pos.map(|v| v as i32)))
     }
@@ -149,7 +149,7 @@ impl DelegateWidget for Input {
         revelation: &mut Revelation,
         _scroll_align: Vec2<Option<Align>>,
     ) {
-        let cursor_idx = self.editor.get_cursor_pos(&*self.text);
+        let cursor_idx = self.editor.get_cursor_index(&*self.text);
         let cursor_pos = self
             .text
             .index_to_virtual_pos(cursor_idx, self.editor.get_wrap_bias())

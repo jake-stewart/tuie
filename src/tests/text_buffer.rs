@@ -369,12 +369,12 @@ fn document_end_on_empty_buffer_is_zero() {
 }
 
 #[test]
-fn move_document_end_directional() {
+fn move_document_edge_directional() {
     let t = make_text("abc");
     let mut c = t.cursor(1);
-    c.move_document_end(&*t, Sign::Positive);
+    c.move_document_edge(&*t, Sign::Positive);
     assert_eq!(c.get_index(), 3);
-    c.move_document_end(&*t, Sign::Negative);
+    c.move_document_edge(&*t, Sign::Negative);
     assert_eq!(c.get_index(), 0);
 }
 

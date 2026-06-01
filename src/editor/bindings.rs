@@ -45,7 +45,7 @@ pub trait InputBindings<T: TextDocument> {
         }
     }
     /// Returns the byte offset for cursor rendering.
-    fn get_cursor_pos(&self, state: &EditorState<T>, text: &T) -> usize {
+    fn get_cursor_index(&self, state: &EditorState<T>, text: &T) -> usize {
         if state.inclusive_selection
             && state.cursor > state.anchor
             && !(state.cursor.at_eof(text) && state.get_wrap_bias() == Sign::Positive)
@@ -57,8 +57,8 @@ pub trait InputBindings<T: TextDocument> {
             state.cursor.get_index()
         }
     }
-    /// Returns the byte range to highlight as the selection.
-    fn get_highlight_range(&self, state: &EditorState<T>, _text: &T) -> std::ops::Range<usize> {
+    /// Returns the selected byte range to render.
+    fn get_selected_range(&self, state: &EditorState<T>, _text: &T) -> std::ops::Range<usize> {
         let (start, end) = state.get_selection();
         start.get_index()..end.get_index()
     }

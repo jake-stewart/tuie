@@ -7,8 +7,8 @@ use crate::editor::char_class::{CharClass, GetCharClass};
 pub trait TextBuffer {
     /// Returns the total length in bytes.
     fn len(&self) -> usize;
-    /// Returns whether `pos` is a `char` boundary.
-    fn is_char_boundary(&self, pos: usize) -> bool;
+    /// Returns whether `index` is a `char` boundary.
+    fn is_char_boundary(&self, index: usize) -> bool;
     /// Returns the substring `range` as a new [`String`].
     fn slice(&self, range: std::ops::Range<usize>) -> String;
 
@@ -33,8 +33,8 @@ pub trait Cursor: Sized + Clone + Eq + Ord {
     /// Returns the byte offset of this cursor.
     fn get_index(&self) -> usize;
 
-    /// Moves the cursor to byte offset `pos`.
-    fn set_index(&mut self, text: &Self::Text, pos: usize);
+    /// Moves the cursor to byte offset `index`.
+    fn set_index(&mut self, text: &Self::Text, index: usize);
 
     /// Returns the char at the current position, or `'\0'` at end of file.
     fn get_char(&self, text: &Self::Text) -> char;
@@ -141,7 +141,7 @@ pub trait CursorMethods: Cursor {
     }
 
     /// Moves to the document start or end depending on `sign`.
-    fn move_document_end(&mut self, text: &Self::Text, sign: Sign) -> &mut Self {
+    fn move_document_edge(&mut self, text: &Self::Text, sign: Sign) -> &mut Self {
         match sign {
             Sign::Positive => self.document_end(text),
             Sign::Negative => self.document_start(),
@@ -149,7 +149,7 @@ pub trait CursorMethods: Cursor {
     }
 
     /// Moves to the line start or end depending on `sign`.
-    fn move_line_end(&mut self, text: &Self::Text, sign: Sign) -> &mut Self {
+    fn move_line_edge(&mut self, text: &Self::Text, sign: Sign) -> &mut Self {
         match sign {
             Sign::Positive => self.line_end(text),
             Sign::Negative => self.line_start(text),
@@ -315,6 +315,6 @@ impl<T: TextBuffer + TextLayout + ?Sized> TextContent for T {}
 pub trait TextDocument: TextContent + 'static {
     /// The cursor type for this document.
     type Cursor: Cursor<Text = Self>;
-    /// Returns a cursor at byte offset `pos`.
-    fn cursor(&self, pos: usize) -> Self::Cursor;
+    /// Returns a cursor at byte offset `index`.
+    fn cursor(&self, index: usize) -> Self::Cursor;
 }

@@ -77,13 +77,13 @@ impl<T: TextDocument> Editor<T> {
     }
 
     /// Returns the byte offset where the cursor should be drawn.
-    pub fn get_cursor_pos(&self, text: &T) -> usize {
-        self.bindings.get_cursor_pos(&self.state, text)
+    pub fn get_cursor_index(&self, text: &T) -> usize {
+        self.bindings.get_cursor_index(&self.state, text)
     }
 
-    /// Returns the byte range to render as highlighted selection.
-    pub fn get_highlight_range(&self, text: &T) -> std::ops::Range<usize> {
-        self.bindings.get_highlight_range(&self.state, text)
+    /// Returns the selected byte range to render.
+    pub fn get_selected_range(&self, text: &T) -> std::ops::Range<usize> {
+        self.bindings.get_selected_range(&self.state, text)
     }
 
     /// Read-only access to the active cursor.
@@ -165,7 +165,7 @@ impl<T: TextDocument> Editor<T> {
         self.state.seal_undo_group();
         let len = text.len();
         self.state.replace_range(text, 0..len, s);
-        self.state.cursor.move_document_end(text, Sign::Negative);
+        self.state.cursor.move_document_edge(text, Sign::Negative);
         self.state.anchor = self.state.cursor.clone();
         self.state.update_preferred_col(text);
     }
@@ -191,28 +191,28 @@ impl<T: TextDocument> Editor<T> {
     }
 
     /// Moves the cursor to the screen line edge and collapses the selection.
-    pub fn move_cursor_line_end(&mut self, text: &T, sign: Sign) {
-        self.state.move_cursor_line_end(text, sign);
+    pub fn move_cursor_line_edge(&mut self, text: &T, sign: Sign) {
+        self.state.move_cursor_line_edge(text, sign);
     }
 
     /// Extends the selection to the screen line edge.
-    pub fn extend_selection_line_end(&mut self, text: &T, sign: Sign) {
-        self.state.extend_selection_line_end(text, sign);
+    pub fn extend_selection_line_edge(&mut self, text: &T, sign: Sign) {
+        self.state.extend_selection_line_edge(text, sign);
     }
 
     /// Moves the cursor to the start or end of the document and collapses the selection.
-    pub fn move_cursor_document_end(&mut self, text: &T, sign: Sign) {
-        self.state.move_cursor_document_end(text, sign);
+    pub fn move_cursor_document_edge(&mut self, text: &T, sign: Sign) {
+        self.state.move_cursor_document_edge(text, sign);
     }
 
     /// Extends the selection to the start or end of the document.
-    pub fn extend_selection_document_end(&mut self, text: &T, sign: Sign) {
-        self.state.extend_selection_document_end(text, sign);
+    pub fn extend_selection_document_edge(&mut self, text: &T, sign: Sign) {
+        self.state.extend_selection_document_edge(text, sign);
     }
 
     /// Extends to the document edge, swapping cursor and anchor when reversing past the anchor.
-    pub fn grow_extend_selection_document_end(&mut self, text: &T, sign: Sign) {
-        self.state.grow_extend_selection_document_end(text, sign);
+    pub fn grow_extend_selection_document_edge(&mut self, text: &T, sign: Sign) {
+        self.state.grow_extend_selection_document_edge(text, sign);
     }
 
     /// Inserts a single character, replacing the selection if any.
@@ -242,7 +242,7 @@ impl<T: TextDocument> Editor<T> {
 
     /// Copies the selection to the clipboard.
     pub fn copy(&mut self, text: &T) {
-        self.state.copy_selection(text);
+        self.state.copy(text);
     }
 
     /// Copies the selection to the clipboard and deletes it.
@@ -256,8 +256,8 @@ impl<T: TextDocument> Editor<T> {
     }
 
     /// Deletes from the cursor to the adjacent line boundary in `sign`.
-    pub fn delete_to_line_end(&mut self, text: &mut T, sign: Sign) {
-        self.state.delete_to_line_end(text, sign);
+    pub fn delete_to_line_edge(&mut self, text: &mut T, sign: Sign) {
+        self.state.delete_to_line_edge(text, sign);
     }
 
     /// Deletes the byte `range`, adjusting for a trailing newline at end of file.
@@ -274,8 +274,8 @@ impl<T: TextDocument> Editor<T> {
     }
 
     /// Deletes the byte `range`.
-    pub fn delete_text(&mut self, text: &mut T, range: std::ops::Range<usize>) {
-        self.state.delete_text(text, range);
+    pub fn delete_range(&mut self, text: &mut T, range: std::ops::Range<usize>) {
+        self.state.delete_range(text, range);
     }
 
     /// Replaces the byte `range` with `s`.

@@ -107,10 +107,10 @@ impl<T: TextDocument> EditorState<T> {
         }
     }
 
-    /// Returns a cursor positioned at byte offset `pos`.
-    pub fn cursor_at_index(&self, text: &T, pos: usize) -> T::Cursor {
+    /// Returns a cursor positioned at byte offset `index`.
+    pub fn cursor_at_index(&self, text: &T, index: usize) -> T::Cursor {
         let mut cursor = self.cursor.clone();
-        cursor.set_index(text, pos);
+        cursor.set_index(text, index);
         cursor
     }
 
@@ -283,7 +283,7 @@ impl<T: TextDocument> EditorState<T> {
     }
 
     /// Deletes the byte `range`.
-    pub fn delete_text(&mut self, text: &mut T, range: std::ops::Range<usize>) {
+    pub fn delete_range(&mut self, text: &mut T, range: std::ops::Range<usize>) {
         self.replace_range(text, range, "");
     }
 
@@ -375,7 +375,7 @@ impl<T: TextDocument> EditorState<T> {
             let mut target = self.cursor.clone();
             target.move_grapheme(text, direction);
             let (start, end) = direction.order(self.cursor.get_index(), target.get_index());
-            self.delete_text(text, start..end);
+            self.delete_range(text, start..end);
             self.cursor.set_index(text, start);
         } else {
             self.delete_selection(text);
@@ -392,7 +392,7 @@ impl<T: TextDocument> EditorState<T> {
             self.cursor.move_word(text, direction);
             let end = self.cursor.get_index();
             let (start, end) = direction.order(start, end);
-            self.delete_text(text, start..end);
+            self.delete_range(text, start..end);
             self.cursor.set_index(text, start);
         } else {
             self.delete_selection(text);
@@ -451,7 +451,7 @@ impl<T: TextDocument> EditorState<T> {
     }
 
     /// Moves the cursor to the start or end of the current wrapped screen line toward `sign`.
-    pub fn move_screen_line_end(&mut self, text: &T, sign: Sign) {
+    pub fn move_screen_line_edge(&mut self, text: &T, sign: Sign) {
         let mut pos = self.cursor.get_virtual_pos(text, self.bias).map(|v| v as i32);
         pos.x = match sign {
             Sign::Positive => i32::MAX,
@@ -640,14 +640,14 @@ impl<T: TextDocument> EditorState<T> {
     }
 
     /// Moves the cursor to the start or end of the current wrapped screen line.
-    pub fn screen_line_end(&mut self, text: &T, sign: Sign) -> Affinity {
-        self.move_screen_line_end(text, sign);
+    pub fn screen_line_edge(&mut self, text: &T, sign: Sign) -> Affinity {
+        self.move_screen_line_edge(text, sign);
         affinity_for_motion(sign)
     }
 
     /// Moves the cursor to the start or end of the document.
-    pub fn document_end(&mut self, text: &T, sign: Sign) -> Affinity {
-        self.cursor.move_document_end(text, sign);
+    pub fn document_edge(&mut self, text: &T, sign: Sign) -> Affinity {
+        self.cursor.move_document_edge(text, sign);
         affinity_for_motion(sign)
     }
 
@@ -658,7 +658,7 @@ impl<T: TextDocument> EditorState<T> {
     }
 
     /// Copies the selection to the clipboard.
-    pub fn copy_selection(&mut self, text: &T) {
+    pub fn copy(&mut self, text: &T) {
         if self.anchor != self.cursor {
             tuie::clipboard::write(ClipboardItem::Text(self.get_selection_text(text)));
         }
@@ -690,7 +690,7 @@ impl<T: TextDocument> EditorState<T> {
     }
 
     /// Deletes from the cursor to the adjacent line boundary in `sign`.
-    pub fn delete_to_line_end(&mut self, text: &mut T, sign: Sign) {
+    pub fn delete_to_line_edge(&mut self, text: &mut T, sign: Sign) {
         self.move_adjacent_line_start(text, sign);
         self.delete_selection(text);
         self.update(text, Affinity::End);
@@ -723,14 +723,14 @@ impl<T: TextDocument> EditorState<T> {
     }
 
     /// Extends the cursor to the document edge in `sign`, swapping cursor and anchor when reversing past the anchor.
-    pub fn grow_document_end(&mut self, text: &T, sign: Sign) -> Affinity {
+    pub fn grow_document_edge(&mut self, text: &T, sign: Sign) -> Affinity {
         if self.cursor.get_index() == sign.flip().bound(text.len())
             && self.anchor.get_index() != sign.bound(text.len())
         {
             std::mem::swap(&mut self.cursor, &mut self.anchor);
-            self.cursor.move_document_end(text, sign);
+            self.cursor.move_document_edge(text, sign);
         } else {
-            self.cursor.move_document_end(text, sign);
+            self.cursor.move_document_edge(text, sign);
         }
         affinity_for_motion(sign)
     }
@@ -767,34 +767,34 @@ impl<T: TextDocument> EditorState<T> {
     }
 
     /// Moves the cursor to the screen line edge and collapses the selection.
-    pub fn move_cursor_line_end(&mut self, text: &T, sign: Sign) {
-        let affinity = self.screen_line_end(text, sign);
+    pub fn move_cursor_line_edge(&mut self, text: &T, sign: Sign) {
+        let affinity = self.screen_line_edge(text, sign);
         self.anchor = self.cursor.clone();
         self.update(text, affinity);
     }
 
     /// Extends the selection to the screen line edge.
-    pub fn extend_selection_line_end(&mut self, text: &T, sign: Sign) {
-        let affinity = self.screen_line_end(text, sign);
+    pub fn extend_selection_line_edge(&mut self, text: &T, sign: Sign) {
+        let affinity = self.screen_line_edge(text, sign);
         self.update(text, affinity);
     }
 
     /// Moves the cursor to the start or end of the document and collapses the selection.
-    pub fn move_cursor_document_end(&mut self, text: &T, sign: Sign) {
-        let affinity = self.document_end(text, sign);
+    pub fn move_cursor_document_edge(&mut self, text: &T, sign: Sign) {
+        let affinity = self.document_edge(text, sign);
         self.anchor = self.cursor.clone();
         self.update(text, affinity);
     }
 
     /// Extends the selection to the start or end of the document.
-    pub fn extend_selection_document_end(&mut self, text: &T, sign: Sign) {
-        let affinity = self.document_end(text, sign);
+    pub fn extend_selection_document_edge(&mut self, text: &T, sign: Sign) {
+        let affinity = self.document_edge(text, sign);
         self.update(text, affinity);
     }
 
     /// Extends the selection to the document edge in `sign`, swapping cursor and anchor when reversing past the anchor.
-    pub fn grow_extend_selection_document_end(&mut self, text: &T, sign: Sign) {
-        let affinity = self.grow_document_end(text, sign);
+    pub fn grow_extend_selection_document_edge(&mut self, text: &T, sign: Sign) {
+        let affinity = self.grow_document_edge(text, sign);
         self.update(text, affinity);
     }
 

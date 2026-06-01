@@ -392,7 +392,7 @@ impl<T: TextDocument + 'static> ViBindings<T> {
         }
         match op {
             ViOperator::Delete | ViOperator::Change => {
-                state.copy_selection(text);
+                state.copy(text);
                 state.delete_selection(text);
                 if matches!(op, ViOperator::Change) {
                     self.set_mode(state, ViMode::Insert);
@@ -402,7 +402,7 @@ impl<T: TextDocument + 'static> ViBindings<T> {
                 state.update_preferred_col(text);
             }
             ViOperator::Yank => {
-                state.copy_selection(text);
+                state.copy(text);
                 state.anchor = state.cursor.clone();
                 state.update_preferred_col(text);
             }
@@ -1970,7 +1970,7 @@ impl<T: TextDocument + 'static> ViBindings<T> {
                 return;
             }
         }
-        state.cursor.move_document_end(text, sign);
+        state.cursor.move_document_edge(text, sign);
     }
 
     fn sentence_boundary(&mut self, state: &mut EditorState<T>, text: &mut T, sign: Sign) {
@@ -2154,7 +2154,7 @@ impl<T: TextDocument + 'static> ViBindings<T> {
     }
 
     fn action_enter_insert_line_end(&mut self, state: &mut EditorState<T>, text: &mut T, sign: Sign) {
-        state.cursor.move_line_end(text, sign);
+        state.cursor.move_line_edge(text, sign);
         state.anchor = state.cursor.clone();
         state.update_preferred_col(text);
         self.set_mode(state, ViMode::Insert);
@@ -2170,12 +2170,12 @@ impl<T: TextDocument + 'static> ViBindings<T> {
     fn action_open_line(&mut self, state: &mut EditorState<T>, text: &mut T, sign: Sign) {
         match sign {
             Sign::Positive => {
-                state.cursor.move_line_end(text, Sign::Positive);
+                state.cursor.move_line_edge(text, Sign::Positive);
                 state.anchor = state.cursor.clone();
                 state.insert_char(text, '\n');
             }
             Sign::Negative => {
-                state.cursor.move_line_end(text, Sign::Negative);
+                state.cursor.move_line_edge(text, Sign::Negative);
                 state.anchor = state.cursor.clone();
                 state.insert_char(text, '\n');
                 state.cursor.prev_grapheme(text);
@@ -2286,7 +2286,7 @@ impl<T: TextDocument + 'static> ViBindings<T> {
                 Ok((Linewise, Column))
             }
             chord!(0) => {
-                state.cursor.move_line_end(text, Sign::Negative);
+                state.cursor.move_line_edge(text, Sign::Negative);
                 Ok((Exclusive, Start))
             }
             chord!('^') => {
@@ -2301,7 +2301,7 @@ impl<T: TextDocument + 'static> ViBindings<T> {
                 Ok((Linewise, Column))
             }
             chord!('$') => {
-                state.cursor.move_line_end(text, Sign::Positive);
+                state.cursor.move_line_edge(text, Sign::Positive);
                 Ok((Inclusive, End))
             }
             chord!('+') | chord!(Enter) => {
@@ -2371,11 +2371,11 @@ impl<T: TextDocument + 'static> ViBindings<T> {
                         Ok((Linewise, Column))
                     }
                     chord!(0) => {
-                        state.move_screen_line_end(text, Sign::Negative);
+                        state.move_screen_line_edge(text, Sign::Negative);
                         Ok((Exclusive, Start))
                     }
                     chord!('$') => {
-                        state.move_screen_line_end(text, Sign::Positive);
+                        state.move_screen_line_edge(text, Sign::Positive);
                         Ok((Inclusive, End))
                     }
                     chord!(e) => {
@@ -2438,7 +2438,7 @@ impl<T: TextDocument + 'static> ViBindings<T> {
 
     fn operator_to_eol(&mut self, state: &mut EditorState<T>, text: &mut T, op: ViOperator) {
         state.anchor = state.cursor.clone();
-        state.cursor.move_line_end(text, Sign::Positive);
+        state.cursor.move_line_edge(text, Sign::Positive);
         std::mem::swap(&mut state.cursor, &mut state.anchor);
         self.apply_operator(state, text, op);
     }
@@ -2891,7 +2891,7 @@ impl<T: TextDocument + 'static> ViBindings<T> {
         if linewise {
             self.leave_visual(state, text);
             state
-                .move_screen_line_end(text, Sign::Negative);
+                .move_screen_line_edge(text, Sign::Negative);
             state.anchor = state.cursor.clone();
         } else {
             self.set_mode(state, ViMode::VisualLine);
@@ -3337,7 +3337,7 @@ impl<T: TextDocument + 'static> ViBindings<T> {
             c
         };
         if start < c {
-            state.delete_text(text, start..c);
+            state.delete_range(text, start..c);
             state.cursor.set_index(text, start);
             state.anchor = state.cursor.clone();
             state.update_preferred_col(text);
@@ -3575,11 +3575,11 @@ impl<T: TextDocument + 'static> InputBindings<T> for ViBindings<T> {
         get_cursor_shape(self.mode)
     }
 
-    fn get_cursor_pos(&self, state: &EditorState<T>, _text: &T) -> usize {
+    fn get_cursor_index(&self, state: &EditorState<T>, _text: &T) -> usize {
         state.cursor.get_index()
     }
 
-    fn get_highlight_range(&self, state: &EditorState<T>, text: &T) -> std::ops::Range<usize> {
+    fn get_selected_range(&self, state: &EditorState<T>, text: &T) -> std::ops::Range<usize> {
         match self.mode {
             ViMode::VisualLine => {
                 let (lo, hi) = state.get_selection();

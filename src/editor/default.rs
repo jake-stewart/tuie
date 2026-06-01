@@ -35,23 +35,23 @@ pub(crate) fn on_input_shared<T: TextDocument>(
         chord!(Ctrl + Arrow(direction) | Alt + Arrow(direction)) => {
             match direction.axis() {
                 Axis2D::X => state.move_cursor_word(text, direction.screen_sign()),
-                Axis2D::Y => state.move_cursor_document_end(text, direction.screen_sign()),
+                Axis2D::Y => state.move_cursor_document_edge(text, direction.screen_sign()),
             }
         }
         chord!(Ctrl + Shift + Arrow(direction) | Alt + Shift + Arrow(direction)) => {
             match direction.axis() {
                 Axis2D::X => state.extend_selection_word(text, direction.screen_sign()),
-                Axis2D::Y => state.grow_extend_selection_document_end(text, direction.screen_sign()),
+                Axis2D::Y => state.grow_extend_selection_document_edge(text, direction.screen_sign()),
             }
         }
-        chord!(Home) => state.move_cursor_line_end(text, Sign::Negative),
-        chord!(End) => state.move_cursor_line_end(text, Sign::Positive),
-        chord!(Shift + Home) => state.extend_selection_line_end(text, Sign::Negative),
-        chord!(Shift + End) => state.extend_selection_line_end(text, Sign::Positive),
-        chord!(Ctrl + Home) => state.move_cursor_document_end(text, Sign::Negative),
-        chord!(Ctrl + End) => state.move_cursor_document_end(text, Sign::Positive),
-        chord!(Ctrl + Shift + Home) => state.extend_selection_document_end(text, Sign::Negative),
-        chord!(Ctrl + Shift + End) => state.extend_selection_document_end(text, Sign::Positive),
+        chord!(Home) => state.move_cursor_line_edge(text, Sign::Negative),
+        chord!(End) => state.move_cursor_line_edge(text, Sign::Positive),
+        chord!(Shift + Home) => state.extend_selection_line_edge(text, Sign::Negative),
+        chord!(Shift + End) => state.extend_selection_line_edge(text, Sign::Positive),
+        chord!(Ctrl + Home) => state.move_cursor_document_edge(text, Sign::Negative),
+        chord!(Ctrl + End) => state.move_cursor_document_edge(text, Sign::Positive),
+        chord!(Ctrl + Shift + Home) => state.extend_selection_document_edge(text, Sign::Negative),
+        chord!(Ctrl + Shift + End) => state.extend_selection_document_edge(text, Sign::Positive),
         chord!(Backspace) => state.delete_char(text, Sign::Negative),
         chord!(Delete) => state.delete_char(text, Sign::Positive),
         chord!(Ctrl + Backspace | Alt + Backspace) => state.delete_word(text, Sign::Negative),
@@ -97,22 +97,22 @@ impl<T: TextDocument + 'static> InputBindings<T> for DefaultBindings<T> {
             chord!(Ctrl + v) | chord!(Ctrl + y) => state.paste(text),
             chord!(Ctrl + t) => state.transpose_chars(text),
 
-            chord!(Ctrl + c) | chord!(Alt + w) => state.copy_selection(text),
+            chord!(Ctrl + c) | chord!(Alt + w) => state.copy(text),
             chord!(Ctrl + A) => state.select_all(text),
             chord!(Ctrl + f) => state.move_cursor(text, Direction2D::Right),
             chord!(Ctrl + b) => state.move_cursor(text, Direction2D::Left),
             chord!(Ctrl + n) => state.move_cursor(text, Direction2D::Down),
             chord!(Ctrl + p) => state.move_cursor(text, Direction2D::Up),
-            chord!(Ctrl + a) => state.move_cursor_line_end(text, Sign::Negative),
-            chord!(Ctrl + e) => state.move_cursor_line_end(text, Sign::Positive),
+            chord!(Ctrl + a) => state.move_cursor_line_edge(text, Sign::Negative),
+            chord!(Ctrl + e) => state.move_cursor_line_edge(text, Sign::Positive),
             chord!(Alt + f) => state.move_cursor_word(text, Sign::Positive),
             chord!(Alt + b) => state.move_cursor_word(text, Sign::Negative),
             chord!(Ctrl + d) => state.delete_char(text, Sign::Positive),
             chord!(Ctrl + h) => state.delete_char(text, Sign::Negative),
             chord!(Ctrl + w) => state.delete_word(text, Sign::Negative),
             chord!(Alt + d) => state.delete_word(text, Sign::Positive),
-            chord!(Ctrl + k) => state.delete_to_line_end(text, Sign::Positive),
-            chord!(Ctrl + u) => state.delete_to_line_end(text, Sign::Negative),
+            chord!(Ctrl + k) => state.delete_to_line_edge(text, Sign::Positive),
+            chord!(Ctrl + u) => state.delete_to_line_edge(text, Sign::Negative),
 
             _ => {
                 if !on_input_shared(state, text, &event) {

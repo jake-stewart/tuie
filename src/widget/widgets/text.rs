@@ -299,8 +299,8 @@ impl TextBuffer for Text {
         self.content.len()
     }
 
-    fn is_char_boundary(&self, pos: usize) -> bool {
-        self.content.as_str().is_char_boundary(pos)
+    fn is_char_boundary(&self, index: usize) -> bool {
+        self.content.as_str().is_char_boundary(index)
     }
 
     fn slice(&self, range: std::ops::Range<usize>) -> String {
@@ -326,8 +326,8 @@ impl TextBuffer for Text {
 
 impl TextDocument for Text {
     type Cursor = TextCursor;
-    fn cursor(&self, pos: usize) -> TextCursor {
-        TextCursor { index: pos }
+    fn cursor(&self, index: usize) -> TextCursor {
+        TextCursor { index }
     }
 }
 
@@ -629,8 +629,8 @@ impl Cursor for TextCursor {
         self.index
     }
 
-    fn set_index(&mut self, text: &Text, pos: usize) {
-        self.index = pos;
+    fn set_index(&mut self, text: &Text, index: usize) {
+        self.index = index;
         let len = text.len();
         while self.index > 0
             && self.index <= len
