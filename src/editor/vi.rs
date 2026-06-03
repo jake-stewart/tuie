@@ -162,33 +162,6 @@ struct SharedViState {
     last_find: Option<ViFindState>,
     insert_entry_pos: Option<usize>,
     replaying: bool,
-    normal_maps: Vec<(Vec<Chord>, Vec<Chord>)>,
-    operator_maps: Vec<(Vec<Chord>, Vec<Chord>)>,
-    visual_maps: Vec<(Vec<Chord>, Vec<Chord>)>,
-    insert_maps: Vec<(Vec<Chord>, Vec<Chord>)>,
-    replace_maps: Vec<(Vec<Chord>, Vec<Chord>)>,
-    cursor_shapes: [CursorShape; 6],
-}
-
-impl ViMode {
-    const fn default_cursor_shape(self) -> CursorShape {
-        match self {
-            ViMode::Normal | ViMode::Visual | ViMode::VisualLine | ViMode::Operator => CursorShape::Block,
-            ViMode::Insert => CursorShape::Beam,
-            ViMode::Replace => CursorShape::Underline,
-        }
-    }
-
-    const fn cursor_shape_idx(self) -> usize {
-        match self {
-            ViMode::Normal => 0,
-            ViMode::Insert => 1,
-            ViMode::Replace => 2,
-            ViMode::Visual => 3,
-            ViMode::VisualLine => 4,
-            ViMode::Operator => 5,
-        }
-    }
 }
 
 thread_local! {
@@ -199,57 +172,121 @@ thread_local! {
         last_find: None,
         insert_entry_pos: None,
         replaying: false,
-        normal_maps: Vec::new(),
-        operator_maps: Vec::new(),
-        visual_maps: Vec::new(),
-        insert_maps: Vec::new(),
-        replace_maps: Vec::new(),
-        cursor_shapes: [
-            ViMode::Normal.default_cursor_shape(),
-            ViMode::Insert.default_cursor_shape(),
-            ViMode::Replace.default_cursor_shape(),
-            ViMode::Visual.default_cursor_shape(),
-            ViMode::VisualLine.default_cursor_shape(),
-            ViMode::Operator.default_cursor_shape(),
-        ],
     });
 }
 
-/// Registers a key mapping active in [`ViMode::Normal`].
-pub fn map_normal(lhs: Vec<Chord>, rhs: Vec<Chord>) {
-    SHARED_VI_STATE.with(|shared| shared.borrow_mut().normal_maps.push((lhs, rhs)));
+/// Cursor shape used for each [`ViMode`].
+#[derive(Clone, Copy)]
+pub struct ViCursorShapes {
+    /// Shape shown in [`ViMode::Normal`].
+    pub normal: CursorShape,
+    /// Shape shown in [`ViMode::Insert`].
+    pub insert: CursorShape,
+    /// Shape shown in [`ViMode::Replace`].
+    pub replace: CursorShape,
+    /// Shape shown in [`ViMode::Visual`].
+    pub visual: CursorShape,
+    /// Shape shown in [`ViMode::VisualLine`].
+    pub visual_line: CursorShape,
+    /// Shape shown in [`ViMode::Operator`].
+    pub operator: CursorShape,
 }
 
-/// Registers a key mapping active in [`ViMode::Operator`].
-pub fn map_operator(lhs: Vec<Chord>, rhs: Vec<Chord>) {
-    SHARED_VI_STATE.with(|shared| shared.borrow_mut().operator_maps.push((lhs, rhs)));
+impl ViCursorShapes {
+    fn for_mode(self, mode: ViMode) -> CursorShape {
+        match mode {
+            ViMode::Normal => self.normal,
+            ViMode::Insert => self.insert,
+            ViMode::Replace => self.replace,
+            ViMode::Visual => self.visual,
+            ViMode::VisualLine => self.visual_line,
+            ViMode::Operator => self.operator,
+        }
+    }
 }
 
-/// Registers a key mapping active in [`ViMode::Visual`] and [`ViMode::VisualLine`].
-pub fn map_visual(lhs: Vec<Chord>, rhs: Vec<Chord>) {
-    SHARED_VI_STATE.with(|shared| shared.borrow_mut().visual_maps.push((lhs, rhs)));
+impl Default for ViCursorShapes {
+    fn default() -> Self {
+        Self {
+            normal: CursorShape::Block,
+            insert: CursorShape::Beam,
+            replace: CursorShape::Underline,
+            visual: CursorShape::Block,
+            visual_line: CursorShape::Block,
+            operator: CursorShape::Block,
+        }
+    }
 }
 
-/// Registers a key mapping active in [`ViMode::Insert`].
-pub fn map_insert(lhs: Vec<Chord>, rhs: Vec<Chord>) {
-    SHARED_VI_STATE.with(|shared| shared.borrow_mut().insert_maps.push((lhs, rhs)));
+/// Options for a vi key mapping.
+#[derive(Clone, Copy, Default)]
+pub struct ViMapOpts {}
+
+impl ViMapOpts {
+    /// Creates the default mapping options.
+    pub fn new() -> Self {
+        Self {}
+    }
 }
 
-/// Registers a key mapping active in [`ViMode::Replace`].
-pub fn map_replace(lhs: Vec<Chord>, rhs: Vec<Chord>) {
-    SHARED_VI_STATE.with(|shared| shared.borrow_mut().replace_maps.push((lhs, rhs)));
+#[derive(Clone)]
+pub(crate) struct ViMapping {
+    pub from: Vec<Chord>,
+    pub to: Vec<Chord>,
+    #[allow(dead_code)]
+    pub opts: ViMapOpts,
 }
 
-/// Sets the cursor shape used when the editor is in `mode`.
-pub fn set_cursor_shape(mode: ViMode, shape: CursorShape) {
-    SHARED_VI_STATE.with(|shared| {
-        shared.borrow_mut().cursor_shapes[mode.cursor_shape_idx()] = shape;
-    });
+/// Configuration shared by all [`ViBindings`] instances.
+#[derive(Clone, Default)]
+pub struct ViConfig {
+    pub(crate) normal_maps: Vec<ViMapping>,
+    pub(crate) operator_maps: Vec<ViMapping>,
+    pub(crate) visual_maps: Vec<ViMapping>,
+    pub(crate) insert_maps: Vec<ViMapping>,
+    pub(crate) replace_maps: Vec<ViMapping>,
+    /// Cursor shape used for each mode.
+    pub cursor_shapes: ViCursorShapes,
 }
 
-/// Returns the cursor shape configured for `mode`.
-pub fn get_cursor_shape(mode: ViMode) -> CursorShape {
-    SHARED_VI_STATE.with(|shared| shared.borrow().cursor_shapes[mode.cursor_shape_idx()])
+impl ViConfig {
+    /// Adds a mapping for `mode` that expands `from` into `to`.
+    pub fn map(&mut self, mode: ViMode, from: Vec<Chord>, to: Vec<Chord>, opts: ViMapOpts) {
+        let maps = match mode {
+            ViMode::Normal => &mut self.normal_maps,
+            ViMode::Operator => &mut self.operator_maps,
+            ViMode::Visual | ViMode::VisualLine => &mut self.visual_maps,
+            ViMode::Insert => &mut self.insert_maps,
+            ViMode::Replace => &mut self.replace_maps,
+        };
+        maps.push(ViMapping { from, to, opts });
+    }
+}
+
+/// Process-wide vi binding configuration.
+pub mod config {
+    use super::*;
+
+    thread_local! {
+        static CONFIG: RefCell<ViConfig> = RefCell::new(ViConfig::default());
+    }
+
+    /// Returns a copy of the current configuration.
+    pub fn get() -> ViConfig {
+        CONFIG.with(|c| c.borrow().clone())
+    }
+
+    /// Applies `f` to the configuration in place.
+    pub fn update(f: impl FnOnce(&mut ViConfig)) {
+        let mut cfg = get();
+        f(&mut cfg);
+        CONFIG.with(|c| *c.borrow_mut() = cfg);
+        crate::dirty_layout();
+    }
+
+    pub(super) fn with<R>(f: impl FnOnce(&ViConfig) -> R) -> R {
+        CONFIG.with(|c| f(&c.borrow()))
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -334,17 +371,17 @@ impl<T: TextDocument> ViBindings<T> {
 
     fn check_mappings(
         queue: &[InputEvent],
-        maps: &[(Vec<Chord>, Vec<Chord>)],
+        maps: &[ViMapping],
     ) -> Result<Option<Vec<Chord>>, ()> {
         let mut has_prefix = false;
-        for (lhs, rhs) in maps {
-            if lhs.len() == queue.len()
-                && lhs.iter().zip(queue).all(|(l, e)| *l == e.chord)
+        for m in maps {
+            if m.from.len() == queue.len()
+                && m.from.iter().zip(queue).all(|(l, e)| *l == e.chord)
             {
-                return Ok(Some(rhs.clone()));
+                return Ok(Some(m.to.clone()));
             }
-            if lhs.len() > queue.len()
-                && lhs[..queue.len()].iter().zip(queue).all(|(l, e)| *l == e.chord)
+            if m.from.len() > queue.len()
+                && m.from[..queue.len()].iter().zip(queue).all(|(l, e)| *l == e.chord)
             {
                 has_prefix = true;
             }
@@ -3424,14 +3461,13 @@ impl<T: TextDocument + 'static> ViBindings<T> {
         mode: ViMode,
         queue: &[InputEvent],
     ) -> Result<Option<Vec<Chord>>, ()> {
-        SHARED_VI_STATE.with(|shared| {
-            let shared = shared.borrow();
+        config::with(|cfg| {
             let maps = match mode {
-                ViMode::Normal => &shared.normal_maps,
-                ViMode::Operator => &shared.operator_maps,
-                ViMode::Visual | ViMode::VisualLine => &shared.visual_maps,
-                ViMode::Insert => &shared.insert_maps,
-                ViMode::Replace => &shared.replace_maps,
+                ViMode::Normal => &cfg.normal_maps,
+                ViMode::Operator => &cfg.operator_maps,
+                ViMode::Visual | ViMode::VisualLine => &cfg.visual_maps,
+                ViMode::Insert => &cfg.insert_maps,
+                ViMode::Replace => &cfg.replace_maps,
             };
             if maps.is_empty() {
                 return Err(());
@@ -3573,7 +3609,7 @@ impl<T: TextDocument + 'static> InputBindings<T> for ViBindings<T> {
     }
 
     fn get_cursor_shape(&self, _state: &EditorState<T>) -> CursorShape {
-        get_cursor_shape(self.mode)
+        config::with(|cfg| cfg.cursor_shapes.for_mode(self.mode))
     }
 
     fn get_cursor_index(&self, state: &EditorState<T>, _text: &T) -> usize {
