@@ -12,10 +12,10 @@ pub struct Track {
     /// Minimum size in cells.
     pub min: Option<u16>,
     /// Preferred size in cells.
-    pub pref: Option<u16>,
+    pub preferred: Option<u16>,
     /// Maximum size in cells.
     pub max: Option<u16>,
-    /// Grow weight.
+    /// Flex weight.
     pub flex: u8,
     /// Top edge for rows, left edge for cols.
     pub start: Option<&'static Border>,
@@ -30,17 +30,17 @@ pub struct Track {
 impl Track {
     /// Returns a track sized from its children.
     pub const fn auto() -> Self {
-        Self { min: None, pref: None, max: None, flex: 0, start: None, end: None, style: Style::new(), border_style: Style::new() }
+        Self { min: None, preferred: None, max: None, flex: 0, start: None, end: None, style: Style::new(), border_style: Style::new() }
     }
 
     /// Returns a fixed-size track of `n` cells.
     pub const fn fixed(n: u16) -> Self {
-        Self { min: Some(n), pref: Some(n), max: Some(n), flex: 0, start: None, end: None, style: Style::new(), border_style: Style::new() }
+        Self { min: Some(n), preferred: Some(n), max: Some(n), flex: 0, start: None, end: None, style: Style::new(), border_style: Style::new() }
     }
 
     /// Returns a child-sized track with flex `weight`.
-    pub const fn grow(weight: u8) -> Self {
-        Self { min: None, pref: None, max: None, flex: weight, start: None, end: None, style: Style::new(), border_style: Style::new() }
+    pub const fn flex(weight: u8) -> Self {
+        Self { min: None, preferred: None, max: None, flex: weight, start: None, end: None, style: Style::new(), border_style: Style::new() }
     }
 
     /// Sets the minimum size in cells.
@@ -50,20 +50,14 @@ impl Track {
     }
 
     /// Sets the preferred size in cells.
-    pub const fn pref(mut self, n: u16) -> Self {
-        self.pref = Some(n);
+    pub const fn preferred(mut self, n: u16) -> Self {
+        self.preferred = Some(n);
         self
     }
 
     /// Sets the maximum size in cells.
     pub const fn max(mut self, n: u16) -> Self {
         self.max = Some(n);
-        self
-    }
-
-    /// Sets the grow weight.
-    pub const fn flex(mut self, w: u8) -> Self {
-        self.flex = w;
         self
     }
 
@@ -487,7 +481,7 @@ impl Grid {
             }
         }
         for (i, t) in self.columns.iter().enumerate() {
-            if let Some(p) = t.pref {
+            if let Some(p) = t.preferred {
                 col_pref[i] = p;
             }
             col_pref[i] = col_pref[i].max(col_min[i]);
@@ -511,7 +505,7 @@ impl Grid {
             }
         }
         for (i, t) in self.rows.iter().enumerate() {
-            if let Some(p) = t.pref {
+            if let Some(p) = t.preferred {
                 row_pref[i] = p;
             }
             row_pref[i] = row_pref[i].max(row_min[i]);
@@ -651,7 +645,7 @@ impl Grid {
                     (pinned, pinned, pinned, 0)
                 }
                 None => {
-                    let pref = track.pref.unwrap_or(row_min[i]).max(row_min[i]).min(track_max);
+                    let pref = track.preferred.unwrap_or(row_min[i]).max(row_min[i]).min(track_max);
                     (pref, row_min[i], track_max, track.flex)
                 }
             };
@@ -1421,9 +1415,9 @@ impl Grid {
         })
     }
 
-    /// Builder form of [`Grid::set_columns`] taking an array.
-    pub fn columns<const N: usize>(mut self: Box<Self>, tracks: [Track; N]) -> Box<Self> {
-        self.set_columns(tracks.to_vec());
+    /// Builder form of [`Grid::set_cols`] taking an array.
+    pub fn cols<const N: usize>(mut self: Box<Self>, tracks: [Track; N]) -> Box<Self> {
+        self.set_cols(tracks.to_vec());
         self
     }
 
@@ -1434,7 +1428,7 @@ impl Grid {
     }
 
     /// Replaces the column track template, dropping any cells outside the new range.
-    pub fn set_columns(&mut self, tracks: Vec<Track>) {
+    pub fn set_cols(&mut self, tracks: Vec<Track>) {
         let n = tracks.len() as u16;
         self.cells.retain(|c| c.col < n);
         self.columns = tracks;
