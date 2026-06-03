@@ -1313,7 +1313,7 @@ pub fn flow_child(child: &mut dyn Widget, size: Vec2<u16>) -> Vec2<u16> {
 }
 
 /// Runs the measure-pass flow for `child` against `size` and returns the outer output size.
-pub fn flow_child_measure(child: &dyn Widget, size: Vec2<u16>) -> Vec2<u16> {
+pub fn measure_child(child: &dyn Widget, size: Vec2<u16>) -> Vec2<u16> {
     let layout = child.get_layout();
     let margin = layout.get_margin_total();
     let content_alloc = Axis2D::map(|a| size[a].saturating_sub(margin[a]));
@@ -1337,14 +1337,14 @@ pub fn flow_child_measure(child: &dyn Widget, size: Vec2<u16>) -> Vec2<u16> {
 }
 
 /// Returns the last layout output size including margin.
-pub fn get_flow_output_size_layout(layout: &Layout) -> Vec2<u16> {
+pub fn flow_output_size(layout: &Layout) -> Vec2<u16> {
     let margin = layout.get_margin_total();
     let content_out = layout.flow_layout.output_size;
     Axis2D::map(|a| content_out[a].saturating_add(margin[a]))
 }
 
 /// Returns the last measure output size including margin.
-pub fn get_flow_output_size_measure(layout: &Layout) -> Vec2<u16> {
+pub fn measure_output_size(layout: &Layout) -> Vec2<u16> {
     let margin = layout.get_margin_total();
     let content_out = layout.get_flow_measure_last();
     Axis2D::map(|a| content_out[a].saturating_add(margin[a]))

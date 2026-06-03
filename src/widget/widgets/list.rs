@@ -3,7 +3,7 @@
 use crate::prelude::*;
 use crate::widget::chrome::ChromeHost;
 use crate::widget::align::{AlignSpec, FlexAlign, Place};
-use crate::widget::get_flow_output_size_layout;
+use crate::widget::flow_output_size;
 use chord_macro::chord;
 use sign::Directional;
 
@@ -362,7 +362,7 @@ impl List {
             flow_child(widget, size);
         }
         if cross_scroll {
-            let content_cross = get_flow_output_size_layout(widget.get_layout())[cross];
+            let content_cross = flow_output_size(widget.get_layout())[cross];
             if content_cross > size[cross] {
                 size[cross] = content_cross;
                 flow_child(widget, size);
@@ -507,7 +507,7 @@ impl List {
         }
         self.recompute_avg_height();
         self.scroll.cross_content_size = self.scroll.cross_content_size.max(
-            self.items.iter().map(|item| get_flow_output_size_layout(item.widget.get_layout())[a.flip()]).max().unwrap_or(0)
+            self.items.iter().map(|item| flow_output_size(item.widget.get_layout())[a.flip()]).max().unwrap_or(0)
         );
     }
 

@@ -3,7 +3,7 @@
 use crate::prelude::*;
 use crate::widget::chrome::ChromeHost;
 use crate::widget::align::{AlignSpec, FlexAlign, Place};
-use crate::widget::{get_flow_output_size_layout, get_flow_output_size_measure};
+use crate::widget::{flow_output_size, measure_output_size};
 use crate::util::stack_pool::StackPool;
 use crate::widget::flex::{self, AsFlexItem, FlexItem};
 use chord_macro::chord;
@@ -480,7 +480,7 @@ impl Pane {
             } else {
                 u16::MAX
             };
-            let out = flow_child_measure(&**child, size_in);
+            let out = measure_child(&**child, size_in);
             state.slots[i].measured = out;
         }
 
@@ -515,7 +515,7 @@ impl Pane {
                     let mut size_in = Vec2::of(0u16);
                     size_in[main] = used_main;
                     size_in[cross] = container_cross;
-                    let out = flow_child_measure(&**child, size_in);
+                    let out = measure_child(&**child, size_in);
                     out[cross]
                 };
                 if stretching {
@@ -604,7 +604,7 @@ impl Pane {
                 } else {
                     u16::MAX
                 };
-                let out = flow_child_measure(&**child, size_in);
+                let out = measure_child(&**child, size_in);
                 let measured_cross = out[cross_axis];
                 let measured_basis = if flex > 0 {
                     0u16
@@ -723,7 +723,7 @@ impl Pane {
                 let mut size_in = Vec2::of(0u16);
                 size_in[main_axis] = used_main;
                 size_in[cross_axis] = container_cross;
-                let out = flow_child_measure(&**child, size_in);
+                let out = measure_child(&**child, size_in);
                 out[cross_axis]
             };
             scratch.cross_sizes[i] = raw.clamp(min_cross, max_cross);
@@ -802,7 +802,7 @@ impl Pane {
             let mut commit = Vec2::of(0u16);
             commit[main_axis] = scratch.items[i].target;
             commit[cross_axis] = scratch.cross_sizes[i];
-            flow_child_measure(&**child, commit);
+            measure_child(&**child, commit);
         }
     }
 
@@ -906,7 +906,7 @@ impl Pane {
 
     fn commit_measure(&self, state: &FlexState) {
         for (i, child) in self.children.iter().enumerate() {
-            flow_child_measure(&**child, state.slots[i].commit);
+            measure_child(&**child, state.slots[i].commit);
         }
     }
 
@@ -1398,7 +1398,7 @@ impl Widget for Pane {
             self.commit_layout(&state);
         });
         self.sync_scrollbars();
-        self.get_flex_total(get_flow_output_size_layout)
+        self.get_flex_total(flow_output_size)
     }
 
     fn layout_measure(&self, allocated: Vec2<u16>) -> Vec2<u16> {
@@ -1417,7 +1417,7 @@ impl Widget for Pane {
             self.flex_resolve(allocated, &mut state);
             self.commit_measure(&state);
         });
-        self.get_flex_total(get_flow_output_size_measure)
+        self.get_flex_total(measure_output_size)
     }
 
     fn after_layout(&mut self) {

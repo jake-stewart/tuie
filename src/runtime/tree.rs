@@ -163,13 +163,13 @@ pub(crate) fn perform_layout(root: &mut dyn Widget, size: Vec2<u16>, shrink_wrap
     recursive_before_layout(root);
     constrain_child(root);
     let size = if shrink_wrap {
-        let measured = flow_child_measure(root, size);
+        let measured = measure_child(root, size);
         let shrunk_x = if root.get_flex() > 0 {
             size[Axis2D::X]
         } else {
             measured[Axis2D::X].min(size[Axis2D::X])
         };
-        let measured = flow_child_measure(root, Vec2::new(shrunk_x, size[Axis2D::Y]));
+        let measured = measure_child(root, Vec2::new(shrunk_x, size[Axis2D::Y]));
         Axis2D::map(|a| {
             if root.get_flex() > 0 {
                 size[a]

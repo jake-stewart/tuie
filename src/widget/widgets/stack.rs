@@ -1,7 +1,7 @@
 //! Container that overlays layer widgets on top of a base widget.
 
 use crate::prelude::*;
-use crate::widget::get_flow_output_size_layout;
+use crate::widget::flow_output_size;
 
 /// Container that overlays one or more layer widgets on top of a base widget.
 pub struct Stack {
@@ -177,20 +177,20 @@ impl Widget for Stack {
             let size = Self::clamp_layer_size(&**layer, allocated, |l| l.constraints.min_size);
             flow_child(&mut **layer, size);
         }
-        let base_clamped = Self::clamp_base_size(&*self.base, allocated, |l| get_flow_output_size_layout(l));
+        let base_clamped = Self::clamp_base_size(&*self.base, allocated, |l| flow_output_size(l));
         let base_margin = self.base.get_layout().get_margin_total();
         self.base.set_rect_size(Axis2D::map(|a| base_clamped[a].saturating_sub(base_margin[a])));
         for layer in self.layers.iter_mut() {
-            let size = Self::clamp_layer_size(&**layer, allocated, |l| get_flow_output_size_layout(l));
+            let size = Self::clamp_layer_size(&**layer, allocated, |l| flow_output_size(l));
             let margin = layer.get_layout().get_margin_total();
             layer.set_rect_size(Axis2D::map(|a| size[a].saturating_sub(margin[a])));
         }
-        get_flow_output_size_layout(self.base.get_layout())
+        flow_output_size(self.base.get_layout())
     }
 
     fn layout_measure(&self, allocated: Vec2<u16>) -> Vec2<u16> {
         let base_size = Self::clamp_base_size(&*self.base, allocated, |l| l.constraints.min_size);
-        flow_child_measure(&*self.base, base_size)
+        measure_child(&*self.base, base_size)
     }
 
     fn layout_position(&mut self) {

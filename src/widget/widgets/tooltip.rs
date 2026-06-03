@@ -2,7 +2,7 @@
 
 use crate::prelude::*;
 use crate::runtime::popup::resolve_placement;
-use crate::widget::get_flow_output_size_layout;
+use crate::widget::flow_output_size;
 
 /// Floating overlay anchored to a child widget, positioned by a [`Placement`].
 pub struct Tooltip {
@@ -62,7 +62,7 @@ impl Widget for Tooltip {
             let alloc_x = body_max.x.min(canvas.x);
             let body_input = Vec2::new(alloc_x, canvas.y);
             flow_child(&mut **body, body_input);
-            let flow_out = get_flow_output_size_layout(body.get_layout());
+            let flow_out = flow_output_size(body.get_layout());
             let body_size = Vec2::new(flow_out.x.min(canvas.x), flow_out.y.min(canvas.y));
             body.set_rect_size(body_size);
         }
@@ -70,7 +70,7 @@ impl Widget for Tooltip {
     }
 
     fn layout_measure(&self, allocated: Vec2<u16>) -> Vec2<u16> {
-        flow_child_measure(&*self.anchor, allocated)
+        measure_child(&*self.anchor, allocated)
     }
 
     fn layout_position(&mut self) {

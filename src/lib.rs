@@ -154,7 +154,7 @@ pub mod prelude {
     pub use super::widget::WidgetMethods;
     pub use super::widget::constrain_child;
     pub use super::widget::flow_child;
-    pub use super::widget::flow_child_measure;
+    pub use super::widget::measure_child;
     pub use super::widget::WidgetState;
     pub use super::widget::Revelation;
 

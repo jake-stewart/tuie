@@ -3,7 +3,7 @@
 use crate::prelude::*;
 use crate::render::border::junction;
 use crate::widget::flex::{self, FlexItem};
-use crate::widget::{get_flow_output_size_layout, get_flow_output_size_measure};
+use crate::widget::{flow_output_size, measure_output_size};
 use chord_macro::chord;
 use sign::Directional;
 use std::cell::{Cell, RefCell};
@@ -384,7 +384,7 @@ impl SplitChild {
     }
 
     fn resize_root(&mut self, new_size: Vec2<u16>, gap: u16, padding: Spacing) {
-        let base_size: BaseSize = get_flow_output_size_layout;
+        let base_size: BaseSize = flow_output_size;
         if self.needs_initial_layout() {
             self.size.set(new_size);
             self.flex_distribute(gap, padding, base_size);
@@ -403,7 +403,7 @@ impl SplitChild {
     }
 
     fn resize_root_measure(&self, new_size: Vec2<u16>, gap: u16, padding: Spacing) {
-        let base_size: BaseSize = get_flow_output_size_measure;
+        let base_size: BaseSize = measure_output_size;
         if self.needs_initial_layout() {
             self.size.set(new_size);
             self.flex_distribute(gap, padding, base_size);
@@ -459,7 +459,7 @@ impl SplitChild {
         padding: Spacing,
         allow_cross_growth: bool,
     ) -> Option<u16> {
-        let base_size: BaseSize = get_flow_output_size_layout;
+        let base_size: BaseSize = flow_output_size;
         let room = self.shrink_room(axis, gap, padding, base_size);
         if room == 0 {
             return None;
@@ -507,7 +507,7 @@ impl SplitChild {
         let allocated = self.leaf_allocated(padding);
         match &self.node {
             SplitNode::Leaf(leaf) => {
-                flow_child_measure(&*leaf.widget, allocated);
+                measure_child(&*leaf.widget, allocated);
             }
             SplitNode::Container { children, .. } => {
                 for c in children {
@@ -584,7 +584,7 @@ impl SplitChild {
     }
 
     fn compute_min_size(&self, gap: u16, padding: Spacing) -> Vec2<u16> {
-        Axis2D::map(|a| self.effective_min(a, gap, padding, get_flow_output_size_layout))
+        Axis2D::map(|a| self.effective_min(a, gap, padding, flow_output_size))
     }
 
     fn clear_dragged(&mut self) {
@@ -751,7 +751,7 @@ impl SplitChild {
             let (lo, hi) = if idx < rcv { (idx, rcv) } else { (rcv, idx) };
             let bridge = gap_between(&children[lo], &children[hi], gap);
             let donation = children[idx].size_along(axis) as i32 + bridge as i32;
-            children[rcv].resize_adjust(axis, donation, gap, padding, get_flow_output_size_layout);
+            children[rcv].resize_adjust(axis, donation, gap, padding, flow_output_size);
             children[rcv].dragged[axis] = None;
         }
 
@@ -965,7 +965,7 @@ impl SplitChild {
 
         for idx in divider_idx + 1..children.len() {
             if let Some(take) = children[idx].try_shrink(axis, needed_capped, gap, padding, allow_cross_growth) {
-                children[grow_idx].resize_adjust(axis, take as i32, gap, padding, get_flow_output_size_layout);
+                children[grow_idx].resize_adjust(axis, take as i32, gap, padding, flow_output_size);
                 return take;
             }
         }
@@ -995,7 +995,7 @@ impl SplitChild {
 
         for idx in (0..=divider_idx).rev() {
             if let Some(take) = children[idx].try_shrink(axis, needed_capped, gap, padding, allow_cross_growth) {
-                children[add_idx].resize_adjust(axis, take as i32, gap, padding, get_flow_output_size_layout);
+                children[add_idx].resize_adjust(axis, take as i32, gap, padding, flow_output_size);
                 return take;
             }
         }
@@ -1120,13 +1120,13 @@ impl SplitChild {
                 let mut total = 0u16;
                 if delta > 0 {
                     for idx in ci + 1..parent.len() {
-                        let room = parent[idx].shrink_room(axis, gap, padding, get_flow_output_size_layout);
+                        let room = parent[idx].shrink_room(axis, gap, padding, flow_output_size);
                         if room == 0 {
                             continue;
                         }
                         let take = room.min(remaining - total);
-                        parent[idx].resize_adjust(axis, -(take as i32), gap, padding, get_flow_output_size_layout);
-                        parent[ci].resize_adjust(axis, take as i32, gap, padding, get_flow_output_size_layout);
+                        parent[idx].resize_adjust(axis, -(take as i32), gap, padding, flow_output_size);
+                        parent[ci].resize_adjust(axis, take as i32, gap, padding, flow_output_size);
                         total += take;
                         if total >= remaining {
                             break;
@@ -1134,13 +1134,13 @@ impl SplitChild {
                     }
                 } else {
                     for idx in (0..ci).rev() {
-                        let room = parent[idx].shrink_room(axis, gap, padding, get_flow_output_size_layout);
+                        let room = parent[idx].shrink_room(axis, gap, padding, flow_output_size);
                         if room == 0 {
                             continue;
                         }
                         let take = room.min(remaining - total);
-                        parent[idx].resize_adjust(axis, -(take as i32), gap, padding, get_flow_output_size_layout);
-                        parent[ci].resize_adjust(axis, take as i32, gap, padding, get_flow_output_size_layout);
+                        parent[idx].resize_adjust(axis, -(take as i32), gap, padding, flow_output_size);
+                        parent[ci].resize_adjust(axis, take as i32, gap, padding, flow_output_size);
                         total += take;
                         if total >= remaining {
                             break;
@@ -2384,7 +2384,7 @@ impl Split {
         self.do_layout();
         self.root.reflow_leaves_mut(self.chrome.padding);
         self.rebuild_render_cache();
-        let result = self.preferred_outer_size(get_flow_output_size_layout);
+        let result = self.preferred_outer_size(flow_output_size);
         self.layout.rect.size = prev_size;
         result
     }
@@ -2393,7 +2393,7 @@ impl Split {
         let inner = self.working_inner(allocated);
         self.root.resize_root_measure(inner, self.gap, self.chrome.padding);
         self.root.reflow_leaves_measure(self.chrome.padding);
-        self.preferred_outer_size(get_flow_output_size_measure)
+        self.preferred_outer_size(measure_output_size)
     }
 
     fn rebuild_render_cache(&mut self) {
@@ -2856,7 +2856,7 @@ impl Widget for Split {
                         let mut s = Vec::new();
                         self.root.snapshot_sizes(&mut s);
                         let before = Axis2D::map(|a| {
-                            self.root.preferred_or_min(a, self.gap, self.chrome.padding, get_flow_output_size_layout)
+                            self.root.preferred_or_min(a, self.gap, self.chrome.padding, flow_output_size)
                         });
                         Some((s, before))
                     } else {
@@ -2896,7 +2896,7 @@ impl Widget for Split {
                     if let Some((snap, before)) = snapshot {
                         let inner = self.inner_content_size();
                         let after = Axis2D::map(|a| {
-                            self.root.preferred_or_min(a, self.gap, self.chrome.padding, get_flow_output_size_layout)
+                            self.root.preferred_or_min(a, self.gap, self.chrome.padding, flow_output_size)
                         });
                         let worsens = [Axis2D::X, Axis2D::Y].iter().any(|&a| {
                             after[a] > inner[a] && after[a] > before[a]
@@ -3068,7 +3068,7 @@ impl Split {
         let target = target.untyped();
         let new_leaf = child.into().into_leaf_data();
         if self.root.split(target, new_leaf, axis, direction, self.gap) {
-            self.root.reinforce_mins(self.gap, self.chrome.padding, get_flow_output_size_layout);
+            self.root.reinforce_mins(self.gap, self.chrome.padding, flow_output_size);
             self.dirty_layout();
         }
     }
@@ -3086,7 +3086,7 @@ impl Split {
     ) {
         let new_node = SplitNode::Leaf(child.into().into_leaf_data());
         self.root.push_to_root(new_node, axis, direction, self.gap);
-        self.root.reinforce_mins(self.gap, self.chrome.padding, get_flow_output_size_layout);
+        self.root.reinforce_mins(self.gap, self.chrome.padding, flow_output_size);
         self.dirty_layout();
     }
 
@@ -3121,8 +3121,8 @@ impl Split {
     /// Resets pane sizes from flex weights, discarding drag adjustments.
     pub fn redistribute(&mut self) {
         self.root.clear_dragged();
-        self.root.flex_distribute(self.gap, self.chrome.padding, get_flow_output_size_layout);
-        self.root.reinforce_mins(self.gap, self.chrome.padding, get_flow_output_size_layout);
+        self.root.flex_distribute(self.gap, self.chrome.padding, flow_output_size);
+        self.root.reinforce_mins(self.gap, self.chrome.padding, flow_output_size);
         self.dirty_layout();
     }
 }

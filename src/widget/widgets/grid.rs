@@ -578,7 +578,7 @@ impl Grid {
             }
             let pad = self.cell_pad(cell).get_total();
             let child_w = w.saturating_sub(pad.x as u32).min(u16::MAX as u32) as u16;
-            let measured = flow_child_measure(&*cell.widget, Vec2::new(child_w, u16::MAX));
+            let measured = measure_child(&*cell.widget, Vec2::new(child_w, u16::MAX));
             let cmin_y = cell.widget.get_layout().constraints.min_size.y as u32;
             let need = (measured.y as u32).max(cmin_y);
             let rs = (cell.row_span.max(1) as usize).min(n_rows - r0);
@@ -1153,7 +1153,7 @@ impl Widget for Grid {
             let actual = if mode_x == FlexAlign::Stretch && mode_y == FlexAlign::Stretch {
                 cell_size
             } else {
-                let measured = flow_child_measure(&*cell.widget, cell_size);
+                let measured = measure_child(&*cell.widget, cell_size);
                 Vec2::new(
                     if mode_x == FlexAlign::Stretch { cell_size.x } else { measured.x.min(cell_size.x) },
                     if mode_y == FlexAlign::Stretch { cell_size.y } else { measured.y.min(cell_size.y) },
@@ -1174,7 +1174,7 @@ impl Widget for Grid {
                 cell_size.x.saturating_sub(pad.x),
                 cell_size.y.saturating_sub(pad.y),
             );
-            flow_child_measure(&*cell.widget, child_size);
+            measure_child(&*cell.widget, child_size);
         }
         Vec2::new(
             Self::natural_min_extent_sum(&local.cols, self.col_chrome_total()),
