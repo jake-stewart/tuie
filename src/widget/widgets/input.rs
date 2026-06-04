@@ -10,13 +10,13 @@ pub type InputBindingsFactory = fn() -> Box<dyn InputBindings<Text>>;
 #[derive(Clone, Copy)]
 pub struct InputConfig {
     /// Style applied to the selected text range.
-    pub highlight_style: Style,
+    pub selected_style: Style,
     /// Factory used to construct the bindings for new [`Input`] instances.
     pub bindings: InputBindingsFactory,
 }
 
 crate::config_module!(InputConfig {
-    highlight_style: Style::new().fg(Color::BLUE).reverse(),
+    selected_style: Style::new().fg(Color::BLUE).reverse(),
     bindings: DefaultBindings::new,
 });
 
@@ -57,7 +57,7 @@ impl Input {
         self.text.clear_highlight();
         let range = self.editor.get_selected_range(&*self.text);
         if !range.is_empty() {
-            let style = self.selected_style.unwrap_or_else(|| config::get().highlight_style);
+            let style = self.selected_style.unwrap_or_else(|| config::get().selected_style);
             self.text.highlight(range, style);
         }
     }
@@ -148,7 +148,7 @@ impl DelegateWidget for Input {
         &mut self,
         _child: Option<WidgetId>,
         revelation: &mut Revelation,
-        _scroll_align: Vec2<Option<Align>>,
+        _align: Vec2<Option<Align>>,
     ) {
         let cursor_idx = self.editor.get_cursor_index(&*self.text);
         let cursor_pos = self
