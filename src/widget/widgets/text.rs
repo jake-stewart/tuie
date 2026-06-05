@@ -94,8 +94,8 @@ pub struct Text {
 
 impl Text {
     fn flow_size(&self, allocated: Vec2<u16>) -> Vec2<u16> {
-        if !self.overflow.wrap {
-            if self.overflow.truncate.is_some() {
+        if !self.overflow.get_wrap() {
+            if self.overflow.get_truncate().is_some() {
                 return Vec2::new(
                     self.content_size.x.min(allocated.x),
                     self.content_size.y.min(allocated.y),
@@ -165,7 +165,7 @@ impl Widget for Text {
         }
         self.content_size = Vec2::new(width, lines);
 
-        let min_size = if self.overflow.wrap || self.overflow.truncate.is_some() {
+        let min_size = if self.overflow.get_wrap() || self.overflow.get_truncate().is_some() {
             Vec2::new(0, self.content_size.y)
         } else {
             self.content_size
@@ -199,7 +199,7 @@ impl Widget for Text {
         let max_size = size.map(|a| a as usize);
         let tabstop = self.tabstop();
 
-        let skip_offset = if !self.overflow.wrap && visible_y_start > 0 {
+        let skip_offset = if !self.overflow.get_wrap() && visible_y_start > 0 {
             let mut text_offset = 0;
             for _ in 0..visible_y_start {
                 match text[text_offset..].find('\n') {
@@ -253,7 +253,7 @@ impl Widget for Text {
             }
 
             ctx.move_to(Vec2::new(line.pad_left as i32, y as i32));
-            if !self.overflow.wrap && self.align == Align::End {
+            if !self.overflow.get_wrap() && self.align == Align::End {
                 ctx.set_style(run_at(offset).1);
                 ctx.write(line.marker);
             }
@@ -274,7 +274,7 @@ impl Widget for Text {
                 col = tab_iter.col;
                 pos = chunk_end;
             }
-            if self.overflow.wrap || self.align != Align::End {
+            if self.overflow.get_wrap() || self.align != Align::End {
                 if !line.marker.is_empty() {
                     ctx.set_style(Style::new());
                 }
