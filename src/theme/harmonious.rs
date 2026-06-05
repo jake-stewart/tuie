@@ -59,32 +59,7 @@ impl Palette {
 
     /// Builds a palette from a [`Theme`].
     pub fn from_theme(theme: super::Theme) -> Self {
-        let bg_lab = lab::from_rgb(theme.bg);
-        let fg_lab = lab::from_rgb(theme.fg);
-        let mid = lab::to_rgb(lab::lerp(0.4, bg_lab, fg_lab));
-        let near_fg = lab::to_rgb(lab::lerp(0.95, bg_lab, fg_lab));
-        Self::from_base16(
-            theme.fg,
-            theme.bg,
-            [
-                theme.bg,
-                theme.red,
-                theme.green,
-                theme.yellow,
-                theme.blue,
-                theme.magenta,
-                theme.cyan,
-                theme.fg,
-                mid,
-                theme.red,
-                theme.green,
-                theme.yellow,
-                theme.blue,
-                theme.magenta,
-                theme.cyan,
-                near_fg,
-            ],
-        )
+        Self::from_base16(theme.fg, theme.bg, theme.indexed)
     }
 
     /// Returns the terminal foreground RGB.
