@@ -115,7 +115,7 @@ pub struct TuiConfig {
     /// The width of a tab character in cells.
     pub tabstop: u8,
     /// Whether inserted tabs are expanded to spaces.
-    pub expandtabs: bool,
+    pub expand_tabs: bool,
     /// Whether the cursor blinks.
     pub cursor_blink: bool,
     /// Whether the terminal reports mouse hover events.
@@ -127,7 +127,7 @@ pub struct TuiConfig {
 crate::config_module!(TuiConfig {
     scrolloff: 1,
     tabstop: 8,
-    expandtabs: true,
+    expand_tabs: true,
     cursor_blink: true,
     hover_events: true,
     always_selected: false,

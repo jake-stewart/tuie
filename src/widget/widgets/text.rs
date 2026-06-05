@@ -132,7 +132,7 @@ impl Text {
 
     fn tabstop(&self) -> Option<u8> {
         let config = tuie::config::get();
-        if config.expandtabs {
+        if config.expand_tabs {
             Some(config.tabstop)
         } else {
             None
