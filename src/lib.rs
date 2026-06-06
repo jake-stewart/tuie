@@ -25,6 +25,7 @@ pub use runtime::{
     config, dirty_layout, dirty_paint,
     disable, emit, enable, ensure_focused, focus_widget, get_focus_chain,
     get_focused_measure, get_focused_widget, get_terminal_info, focus_next_tab_order, focus_next_directionally,
+    in_focus_chain, is_focused, is_gui,
     on_quit, quit, reveal, schedule, send, set_output, set_spawner, spawn, start_tui,
     spawn_stream, suspend,
 };

@@ -158,12 +158,12 @@ impl FontCache {
             db.load_system_fonts();
             db
         });
-        let families: Vec<fontdb::Family> = match cfg.font_family {
+        let families: Vec<fontdb::Family> = match &cfg.font_family {
             Some(name) => vec![fontdb::Family::Name(name), fontdb::Family::Monospace],
             None => vec![fontdb::Family::Monospace],
         };
-        let primary_data: Vec<u8> = if let Some(data) = cfg.font_data {
-            data.to_vec()
+        let primary_data: Vec<u8> = if let Some(data) = &cfg.font_data {
+            data.clone()
         } else {
             let query = fontdb::Query {
                 families: &families,
@@ -179,7 +179,7 @@ impl FontCache {
             .new_memory_face(Rc::new(primary_data), 0)
             .map_err(Self::io_err)?;
         let mut fonts = vec![primary];
-        for &name in cfg.font_fallbacks.iter().chain(Self::platform_fallbacks().iter()) {
+        for name in cfg.font_fallbacks.iter().map(String::as_str).chain(Self::platform_fallbacks().iter().copied()) {
             if let Some(font) = Self::load_named(&library, &db, name, fontdb::Weight::NORMAL, fontdb::Style::Normal) {
                 fonts.push(font);
             }

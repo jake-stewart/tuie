@@ -47,16 +47,16 @@ impl std::fmt::Display for TitleBar {
 }
 
 /// GUI backend configuration.
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct GuiConfig {
     /// The system font family name.
-    pub font_family: Option<&'static str>,
+    pub font_family: Option<String>,
     /// The font size in logical pixels.
     pub font_size: f32,
     /// Bundled font bytes, taking precedence over `font_family`.
-    pub font_data: Option<&'static [u8]>,
+    pub font_data: Option<Vec<u8>>,
     /// Family names tried in order for glyphs the primary font lacks.
-    pub font_fallbacks: &'static [&'static str],
+    pub font_fallbacks: Vec<String>,
     /// The title-bar style.
     pub title_bar: TitleBar,
     /// Whether to extend edge-row backgrounds into the side padding.
@@ -78,30 +78,80 @@ pub struct GuiConfig {
     /// The theme applied when the active appearance is dark.
     pub dark_theme: Theme,
     /// The forced color scheme, or `None` to follow the OS appearance.
-    pub appearance: Option<ColorScheme>,
+    pub color_scheme: Option<ColorScheme>,
 }
 
-crate::config_module!(GuiConfig {
-    font_family: None,
-    font_size: 14.0,
-    font_data: None,
-    font_fallbacks: &[],
-    title_bar: TitleBar::Padding,
-    extend_sides: false,
-    extend_header: false,
-    extend_footer: false,
-    horizontal_padding: 0,
-    vertical_padding: 0,
-    center_grid: false,
-    cursor_style: Style::new().fg(Color::Background).bg(Color::Foreground),
-    light_theme: Theme::CENTURY_LIGHT,
-    dark_theme: Theme::CENTURY_DARK,
-    appearance: None,
-});
+impl Default for GuiConfig {
+    fn default() -> Self {
+        Self {
+            font_family: None,
+            font_size: 14.0,
+            font_data: None,
+            font_fallbacks: Vec::new(),
+            title_bar: TitleBar::Padding,
+            extend_sides: false,
+            extend_header: false,
+            extend_footer: false,
+            horizontal_padding: 0,
+            vertical_padding: 0,
+            center_grid: false,
+            cursor_style: Style::new().fg(Color::Background).bg(Color::Foreground),
+            light_theme: Theme::CENTURY_LIGHT,
+            dark_theme: Theme::CENTURY_DARK,
+            color_scheme: None,
+        }
+    }
+}
+
+pub mod config {
+    #[allow(unused_imports)]
+    use super::*;
+    ::std::thread_local! {
+        static CONFIG: ::std::cell::RefCell<super::GuiConfig> =
+            ::std::cell::RefCell::new(super::GuiConfig::default());
+    }
+
+    /// Returns a copy of the current configuration.
+    pub fn get() -> super::GuiConfig {
+        CONFIG.with(|c| c.borrow().clone())
+    }
+
+    fn set(cfg: super::GuiConfig) {
+        let prev = CONFIG.with(|c| c.replace(cfg.clone()));
+        crate::dirty_layout();
+        if cfg.font_size != prev.font_size {
+            crate::runtime::try_with_gui_state(|s| {
+                s.reload_font_if_needed();
+                if let Some(backend) = s.backend.as_mut() {
+                    backend.clear_glyph_atlas();
+                }
+                s.relayout();
+            });
+        }
+        #[cfg(feature = "harmonious")]
+        if cfg.light_theme != prev.light_theme
+            || cfg.dark_theme != prev.dark_theme
+            || cfg.color_scheme != prev.color_scheme
+        {
+            crate::runtime::try_with_gui_state(|s| {
+                let win_theme = s.window.as_ref().and_then(|w| w.theme());
+                super::apply_window_theme(win_theme, &cfg);
+            });
+            crate::runtime::dirty_paint();
+        }
+    }
+
+    /// Applies `f` to the configuration in place.
+    pub fn update(f: impl FnOnce(&mut super::GuiConfig)) {
+        let mut cfg = get();
+        f(&mut cfg);
+        set(cfg);
+    }
+}
 
 #[cfg(feature = "harmonious")]
 fn apply_window_theme(win_theme: Option<winit::window::Theme>, cfg: &GuiConfig) {
-    let scheme = cfg.appearance.unwrap_or_else(|| match win_theme {
+    let scheme = cfg.color_scheme.unwrap_or_else(|| match win_theme {
         Some(winit::window::Theme::Light) => ColorScheme::Light,
         _ => ColorScheme::Dark,
     });
@@ -110,28 +160,6 @@ fn apply_window_theme(win_theme: Option<winit::window::Theme>, cfg: &GuiConfig) 
         ColorScheme::Dark => cfg.dark_theme,
     };
     crate::theme::harmonious::apply_palette(crate::theme::harmonious::Palette::from_theme(theme));
-}
-
-/// Re-applies the active GUI theme from [`GuiConfig`].
-#[cfg(feature = "harmonious")]
-pub fn reapply_theme() {
-    crate::runtime::try_with_gui_state(|s| {
-        let win_theme = s.window.as_ref().and_then(|w| w.theme());
-        apply_window_theme(win_theme, &config::get());
-    });
-    crate::runtime::dirty_paint();
-}
-
-/// Sets the GUI font size in logical pixels.
-pub fn set_font_size(px: f32) {
-    config::update(|cfg| cfg.font_size = px);
-    crate::runtime::try_with_gui_state(|s| {
-        s.reload_font_if_needed();
-        if let Some(backend) = s.backend.as_mut() {
-            backend.clear_glyph_atlas();
-        }
-        s.relayout();
-    });
 }
 
 /// Returns `(left, right)` cell-column counts to keep clear of OS title-bar chrome.
