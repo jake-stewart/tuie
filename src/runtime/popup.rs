@@ -22,12 +22,9 @@ thread_local! {
 /// Anchor and popup alignment points plus a cell offset that resolve a popup's screen position.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Placement {
-    /// Alignment point on the anchor rect that the popup point lines up with.
-    pub anchor_point: Vec2<Align>,
-    /// Alignment point on the popup rect that is positioned at the anchor point.
-    pub popup_point: Vec2<Align>,
-    /// Additional cell offset applied after alignment resolution.
-    pub offset: Vec2<i16>,
+    pub(crate) anchor_point: Vec2<Align>,
+    pub(crate) popup_point: Vec2<Align>,
+    pub(crate) offset: Vec2<i16>,
 }
 
 impl Placement {
@@ -70,6 +67,18 @@ impl Placement {
         }
     }
 
+    /// Sets the alignment point on the anchor rect that the popup point lines up with.
+    pub fn anchor_point(mut self, point: Vec2<Align>) -> Self {
+        self.anchor_point = point;
+        self
+    }
+
+    /// Sets the alignment point on the popup rect that is positioned at the anchor point.
+    pub fn popup_point(mut self, point: Vec2<Align>) -> Self {
+        self.popup_point = point;
+        self
+    }
+
     /// Sets the cell offset applied after alignment resolution.
     pub fn offset(mut self, offset: Vec2<i16>) -> Self {
         self.offset = offset;
@@ -100,10 +109,19 @@ impl Popup {
         self
     }
 
-    /// Sets whether outside interaction closes the popup automatically.
-    pub fn dismissible(mut self, dismissible: bool) -> Self {
-        self.dismissible = dismissible;
+    /// Makes outside interaction close the popup automatically.
+    pub fn dismissible(mut self) -> Self {
+        self.dismissible = true;
         self
+    }
+
+    /// Calls [`Popup::dismissible`] when `value` is `true`.
+    pub fn dismissible_if(self, value: bool) -> Self {
+        if value {
+            self.dismissible()
+        } else {
+            self
+        }
     }
 }
 
