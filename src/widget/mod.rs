@@ -895,6 +895,11 @@ pub trait DelegateWidget: 'static {
         self.get_delegate().find_descendant_at_pos(pos, predicate, path)
     }
 
+    /// Override hook for [`Widget::get_subcell_offset`].
+    fn override_get_subcell_offset(&self) -> Vec2<f32> {
+        self.get_delegate().get_subcell_offset()
+    }
+
     /// Override hook for [`Widget::each_child`].
     fn override_each_child(
         &self,
@@ -1016,11 +1021,6 @@ pub trait DelegateWidget: 'static {
         self.get_delegate_mut().before_focus_move(selected_child, axis, direction);
     }
 
-    /// Override hook for [`Widget::get_subcell_offset`].
-    fn override_get_subcell_offset(&self) -> Vec2<f32> {
-        self.get_delegate().get_subcell_offset()
-    }
-
     /// Called after [`Widget::before_layout`] on the delegate.
     fn after_before_layout(&mut self) {}
 
@@ -1114,6 +1114,10 @@ impl<T: DelegateWidget> Widget for T {
         path: Option<&mut Vec<WidgetId>>,
     ) -> Option<WidgetId> {
         self.override_find_descendant_at_pos(pos, predicate, path)
+    }
+
+    fn get_subcell_offset(&self) -> Vec2<f32> {
+        self.override_get_subcell_offset()
     }
 
     fn each_child(
@@ -1232,10 +1236,6 @@ impl<T: DelegateWidget> Widget for T {
     ) {
         self.override_before_focus_move(selected_child, axis, direction);
         self.after_before_focus_move(selected_child, axis, direction);
-    }
-
-    fn get_subcell_offset(&self) -> Vec2<f32> {
-        self.override_get_subcell_offset()
     }
 }
 
@@ -1403,6 +1403,11 @@ pub trait Widget: std::any::Any {
         None
     }
 
+    /// Returns the render-time shift of this widget's content in cell fractions.
+    fn get_subcell_offset(&self) -> Vec2<f32> {
+        Vec2::of(0.0)
+    }
+
     /// Calls `f` on each direct child in the order implied by `direction`.
     fn each_child(
         &self,
@@ -1526,11 +1531,6 @@ pub trait Widget: std::any::Any {
         _axis: Option<Axis2D>,
         _direction: Sign,
     ) {}
-
-    /// Returns the render-time shift of this widget's content in cell fractions.
-    fn get_subcell_offset(&self) -> Vec2<f32> {
-        Vec2::of(0.0)
-    }
 }
 
 /// Convenience methods on every [`Widget`].

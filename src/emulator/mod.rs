@@ -1,4 +1,4 @@
-//! Test harness for driving widgets through the runtime.
+//! Terminal emulator for driving widgets through the runtime.
 
 use crate::prelude::*;
 
@@ -6,7 +6,7 @@ use crate::prelude::*;
 pub struct Emulator(());
 
 impl Emulator {
-    /// Creates a [`Emulator`] with `root` rendered at `size`.
+    /// Creates an [`Emulator`] with `root` rendered at `size`.
     pub fn new(root: &mut dyn Widget, size: Vec2<u16>) -> Self {
         crate::runtime::init_emulator(size);
         let _ = crate::runtime::update(root, &[RuntimeEvent::Resize(size)]);
@@ -16,6 +16,11 @@ impl Emulator {
     /// Processes `events` through the runtime.
     pub fn update(&mut self, root: &mut dyn Widget, events: &[RuntimeEvent]) {
         let _ = crate::runtime::update(root, events);
+    }
+
+    /// Overrides the emulated [`TerminalInfo`] capabilities, e.g. `cell_size` and `subcell_events`.
+    pub fn update_terminal_info(&mut self, f: impl FnOnce(&mut TerminalInfo)) {
+        crate::runtime::update_terminal_info(f);
     }
 
     /// Returns the most recently rendered frame as a [`StyledString`].

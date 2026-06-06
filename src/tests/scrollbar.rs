@@ -352,3 +352,64 @@ fn horizontal_click_track_jumps_thumb() {
     term.update(&mut *pane, &[click(Vec2::new(3, 1)), release(Vec2::new(3, 1))]);
     assert_eq!(pane.get_scroll_progress(Axis2D::X), 1.0);
 }
+
+fn subcell_event(chord: Chord, pos: Vec2<f32>) -> RuntimeEvent {
+    RuntimeEvent::Input(InputEvent { chord, pos, count: 1 })
+}
+
+fn enable_subcell_events(term: &mut Emulator) {
+    term.update_terminal_info(|info| {
+        info.cell_size = Some(Vec2::new(10, 20));
+        info.subcell_events = true;
+    });
+}
+
+fn fractional_drag(pane: &mut Pane, term: &mut Emulator) {
+    term.update(pane, &[
+        subcell_event(chord!(LeftClick), Vec2::new(1.5, 0.5)),
+        subcell_event(chord!(LeftDrag), Vec2::new(1.5, 1.125)),
+        release(Vec2::new(1, 1)),
+    ]);
+}
+
+#[test]
+fn tty_subcell_drag_still_renders_content() {
+    let mut pane = vert(ScrollbarThumb::SINGLE, 8);
+    let mut term = Emulator::new(&mut *pane, Vec2::new(2, 4));
+    enable_subcell_events(&mut term);
+    fractional_drag(&mut pane, &mut term);
+    term.assert_lines([
+        "1╷",
+        "2│",
+        "3╵",
+        "4 ",
+    ]);
+}
+
+#[test]
+fn tty_subcell_drag_round_trips_progress() {
+    let mut pane = vert(ScrollbarThumb::SINGLE, 8);
+    let mut term = Emulator::new(&mut *pane, Vec2::new(2, 4));
+    enable_subcell_events(&mut term);
+    fractional_drag(&mut pane, &mut term);
+    assert_eq!(pane.get_scroll_progress(Axis2D::Y), 0.3125);
+}
+
+#[test]
+fn tty_subcell_drag_hit_test_matches_drawn_cells() {
+    let mut pane = Pane::new()
+        .vertical()
+        .y_scroll(Scrollbar::Visible)
+        .scrollbar_style(style_with_thumb(ScrollbarThumb::SINGLE));
+    let mut ids = Vec::new();
+    for i in 0..8 {
+        let text = Text::new().content(i.to_string());
+        ids.push(text.get_id());
+        pane.add_child(text);
+    }
+    let mut term = Emulator::new(&mut *pane, Vec2::new(2, 4));
+    enable_subcell_events(&mut term);
+    fractional_drag(&mut pane, &mut term);
+    let hit = pane.descendant_at_pos(Vec2::new(0.5, 0.9), None);
+    assert_eq!(hit, Some(ids[1].untyped()));
+}
