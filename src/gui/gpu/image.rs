@@ -98,7 +98,6 @@ const IMG_ATTRS: [wgpu::VertexAttribute; 3] = wgpu::vertex_attr_array![
 pub(super) struct ImagePipeline {
     pipeline: wgpu::RenderPipeline,
     uniform_buffer: wgpu::Buffer,
-    sampler: wgpu::Sampler,
     group0: wgpu::BindGroup,
     texture_layout: wgpu::BindGroupLayout,
 
@@ -236,7 +235,6 @@ impl ImagePipeline {
         Self {
             pipeline,
             uniform_buffer,
-            sampler,
             group0,
             texture_layout,
             instance_buffer,
