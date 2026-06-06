@@ -101,12 +101,6 @@ impl<T: TextDocument> Editor<T> {
         self.state.get_wrap_bias()
     }
 
-    /// Returns the selection as an ordered `(low, high)` byte index pair.
-    pub fn get_selection_range(&self) -> (usize, usize) {
-        let (start, end) = self.state.get_selection();
-        (start.get_index(), end.get_index())
-    }
-
     /// Returns the selected substring.
     pub fn get_selection_text(&self, text: &T) -> String {
         self.state.get_selection_text(text)
@@ -146,7 +140,7 @@ impl<T: TextDocument> Editor<T> {
 
     /// Returns whether the selection includes the grapheme under the cursor.
     pub fn is_inclusive_selection(&self) -> bool {
-        self.state.is_inclusive_selection()
+        self.state.inclusive_selection
     }
 
     /// Replaces the entire document with `s`, moving the cursor to the end.
@@ -283,8 +277,8 @@ impl<T: TextDocument> Editor<T> {
         self.state.is_dirty()
     }
 
-    /// Returns the `(top, bottom)` inclusive-exclusive visible row range.
-    pub fn get_visible_region(&self, text: &T) -> (i32, i32) {
-        self.state.get_visible_region(text)
+    /// Returns the visible row range.
+    pub fn get_visible_range(&self, text: &T) -> std::ops::Range<i32> {
+        self.state.get_visible_range(text)
     }
 }

@@ -142,11 +142,6 @@ impl<T: TextDocument> EditorState<T> {
         self.bias
     }
 
-    /// Returns whether the selection includes the grapheme under the cursor.
-    pub fn is_inclusive_selection(&self) -> bool {
-        self.inclusive_selection
-    }
-
     /// Applies `affinity` after a motion, updating the wrap bias and preferred column.
     pub fn update(&mut self, text: &T, affinity: Affinity) {
         if self.cursor.at_eof(text) {
@@ -460,13 +455,13 @@ impl<T: TextDocument> EditorState<T> {
         self.cursor = self.cursor_at_pos(text, pos);
     }
 
-    /// Returns the `(top, bottom)` inclusive-exclusive visible row range.
-    pub fn get_visible_region(&self, text: &T) -> (i32, i32) {
+    /// Returns the visible row range.
+    pub fn get_visible_range(&self, text: &T) -> std::ops::Range<i32> {
         if let Some(measure) = tuie::get_focused_measure() {
             let offset = measure.visible_pos.y as i32 - measure.pos.y;
-            (offset, offset + measure.visible_size.y as i32)
+            offset..offset + measure.visible_size.y as i32
         } else {
-            (0, text.get_visible_size().y as i32)
+            0..text.get_visible_size().y as i32
         }
     }
 
@@ -514,7 +509,7 @@ impl<T: TextDocument> EditorState<T> {
         self.update_preferred_col(text);
     }
 
-    /// Selects the word at screen position `pos` by expanding through matching [`CharClass`].
+    /// Selects the word at screen position `pos` by expanding through matching [`CharClass`](crate::editor::char_class::CharClass).
     pub fn double_click(&mut self, text: &T, pos: Vec2<i32>) {
         if text.len() == 0 {
             return;

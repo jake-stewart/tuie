@@ -1904,20 +1904,20 @@ impl<T: TextDocument + 'static> ViBindings<T> {
     }
 
     fn motion_screen_top(&mut self, state: &mut EditorState<T>, text: &mut T, count: usize) {
-        let (top, _) = state.get_visible_region(text);
+        let top = state.get_visible_range(text).start;
         let scrolloff = if top == 0 { 0 } else { tuie::config::get().scrolloff as i32 };
         let y = top + scrolloff + (count - 1) as i32;
         state.cursor = state.cursor_at_pos(text, Vec2::new(0, y));
     }
 
     fn motion_screen_middle(&mut self, state: &mut EditorState<T>, text: &mut T) {
-        let (top, bottom) = state.get_visible_region(text);
+        let range = state.get_visible_range(text);
         state.cursor =
-            state.cursor_at_pos(text, Vec2::new(0, (top + bottom) / 2));
+            state.cursor_at_pos(text, Vec2::new(0, (range.start + range.end) / 2));
     }
 
     fn motion_screen_bottom(&mut self, state: &mut EditorState<T>, text: &mut T, count: usize) {
-        let (_, bottom) = state.get_visible_region(text);
+        let bottom = state.get_visible_range(text).end;
         let at_end = bottom >= text.get_visible_size().y as i32;
         let scrolloff = if at_end { 0 } else { tuie::config::get().scrolloff as i32 };
         let y = bottom - count as i32 - scrolloff;
