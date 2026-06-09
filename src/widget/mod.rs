@@ -369,7 +369,7 @@ impl Spacing {
         })
     }
     /// Creates equal spacing on each axis scaled to `n` horizontal cells.
-    pub fn balanced(n: u8) -> Self {
+    pub const fn balanced(n: u8) -> Self {
         let y = (n + 1) / 3;
         Spacing(Vec2 {
             x: [n, n],
