@@ -196,15 +196,20 @@ impl TerminalQuery for QueryKittyGraphicsSupport {
     type Response = Option<bool>;
 
     fn query_bytes(&self) -> Vec<u8> {
-        #[cfg(all(unix, feature = "images"))]
-        if let Some(name) = crate::render::image::shm::write_probe() {
-            use base64_simd::STANDARD as BASE64;
-            let mut bytes = b"\x1b_Gi=31,s=1,v=1,a=q,t=s,f=24;".to_vec();
-            bytes.extend_from_slice(BASE64.encode_to_string(name.as_bytes()).as_bytes());
-            bytes.extend_from_slice(b"\x1b\\");
-            return bytes;
+        #[cfg(not(feature = "images"))]
+        return Vec::new();
+        #[cfg(feature = "images")]
+        {
+            #[cfg(unix)]
+            if let Some(name) = crate::render::image::shm::write_probe() {
+                use base64_simd::STANDARD as BASE64;
+                let mut bytes = b"\x1b_Gi=31,s=1,v=1,a=q,t=s,f=24;".to_vec();
+                bytes.extend_from_slice(BASE64.encode_to_string(name.as_bytes()).as_bytes());
+                bytes.extend_from_slice(b"\x1b\\");
+                return bytes;
+            }
+            b"\x1b_Gi=31,s=1,v=1,a=q,t=d,f=24;AAAA\x1b\\".to_vec()
         }
-        b"\x1b_Gi=31,s=1,v=1,a=q,t=d,f=24;AAAA\x1b\\".to_vec()
     }
 
     fn matches(&self, event: &ParsedEvent) -> bool {
