@@ -277,6 +277,7 @@ struct RuntimeContext {
     renderer: GridRenderer,
     terminal_initialized: bool,
     cursor_visible: bool,
+    emulator_cursor: Option<(CursorShape, Vec2<i32>)>,
     buf: String,
     mouse_pixel_dpr: Option<Vec2<u8>>,
 }
@@ -308,6 +309,7 @@ impl RuntimeContext {
             renderer: GridRenderer::new(),
             terminal_initialized: false,
             cursor_visible: true,
+            emulator_cursor: None,
             buf: String::new(),
             mouse_pixel_dpr: None,
         }
@@ -1080,6 +1082,11 @@ pub(crate) fn init_emulator(size: Vec2<u16>) {
 /// Returns the most recently rendered frame as a [`crate::render::style::StyledString`] snapshot.
 pub(crate) fn get_emulator_snapshot() -> crate::render::style::StyledString {
     with_ctx(|ctx| ctx.renderer.get_snapshot())
+}
+
+/// Returns the cursor from the most recently rendered emulator frame.
+pub(crate) fn get_emulator_cursor() -> Option<(CursorShape, Vec2<i32>)> {
+    with_ctx(|ctx| ctx.emulator_cursor)
 }
 
 fn read(timeout: Option<Duration>) -> std::io::Result<Vec<RuntimeEvent>> {
@@ -2507,8 +2514,12 @@ impl Runtime {
         root: &dyn Widget,
         terminal_size: Vec2<u16>,
     ) -> Option<(CursorShape, Vec2<i32>)> {
-        let (shape, cursor_pos) = root.get_cursor(self.focused_widget_id())?;
-        let pos = cursor_pos + root.get_pos();
+        let active_root = self.get_active_root(root);
+        let selected = self
+            .focused_widget_id()
+            .filter(|&id| id != active_root.get_id());
+        let (shape, cursor_pos) = active_root.get_cursor(selected)?;
+        let pos = cursor_pos + active_root.get_pos();
         let in_bounds = Axis2D::all(|a| {
             pos[a] >= -1 && pos[a] <= terminal_size[a] as i32
         });
@@ -2603,7 +2614,8 @@ impl Runtime {
                     && pos.x < term_size.x as i32
                     && pos.y < term_size.y as i32
             };
-            if let Some((shape, pos)) = cursor.filter(|(_, p)| in_grid(*p)) {
+            let visible_cursor = cursor.filter(|(_, p)| in_grid(*p));
+            if let Some((shape, pos)) = visible_cursor {
                 output::move_to(buf, pos.x as u16, pos.y as u16);
                 cursor_visible = true;
                 if !was_visible {
@@ -2620,7 +2632,10 @@ impl Runtime {
                     output::hide_cursor(buf);
                 }
             }
-            with_ctx_mut(|ctx| ctx.cursor_visible = was_visible);
+            with_ctx_mut(|ctx| {
+                ctx.cursor_visible = was_visible;
+                ctx.emulator_cursor = visible_cursor;
+            });
             buffer.write_all(buf.as_bytes())?;
             buffer.flush()?;
             Ok(())

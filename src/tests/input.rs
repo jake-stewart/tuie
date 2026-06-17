@@ -1,8 +1,8 @@
 //! Integration tests for the input widget.
 
-use tuie::prelude::*;
-use tuie::emulator::Emulator;
 use chord_macro::chord;
+use tuie::emulator::Emulator;
+use tuie::prelude::*;
 
 #[test]
 fn renders_empty() {
@@ -106,6 +106,29 @@ fn single_line_strips_newlines_from_content() {
     let term = Emulator::new(&mut *input, Vec2::new(5, 1));
     term.assert_lines(["abc  "]);
     assert_eq!(input.get_string(), "abc");
+}
+
+#[test]
+fn popup_input_reports_terminal_cursor() {
+    let popup_pos = Vec2::new(4, 1);
+    let mut root = Pane::new().children([Text::new().content("root") as Box<dyn Widget>]);
+    let mut term = Emulator::new(&mut *root, Vec2::new(20, 5));
+
+    tuie::open_popup(
+        Popup::new(
+            Input::new()
+                .content("abc")
+                .bindings(ModernBindings::new) as Box<dyn Widget>,
+        )
+        .placement(
+            Placement::center()
+                .anchor_point(Vec2::of(Align::Start))
+                .popup_point(Vec2::of(Align::Start))
+                .offset(popup_pos),
+        ),
+    );
+    term.update(&mut *root, &[]);
+    assert_eq!(term.get_cursor(), Some((CursorShape::Beam, Vec2::new(7, 1))));
 }
 
 #[test]

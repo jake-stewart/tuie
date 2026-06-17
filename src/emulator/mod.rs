@@ -28,6 +28,11 @@ impl Emulator {
         crate::runtime::get_emulator_snapshot()
     }
 
+    /// Returns the terminal cursor from the most recently rendered frame.
+    pub fn get_cursor(&self) -> Option<(CursorShape, Vec2<i32>)> {
+        crate::runtime::get_emulator_cursor()
+    }
+
     /// Returns the most recently rendered frame as plain text.
     pub fn get_snapshot_text(&self) -> String {
         self.get_snapshot().into_string()
