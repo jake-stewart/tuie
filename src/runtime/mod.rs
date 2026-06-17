@@ -733,6 +733,16 @@ pub fn on_quit(cb: impl FnMut(&mut dyn Write) + 'static) -> TaskHandle {
     })
 }
 
+fn run_quit_handlers() {
+    let mut out = Vec::new();
+    for cb in take_quit_handlers().iter_mut() {
+        cb(&mut out);
+    }
+    with_ctx_mut(|ctx| {
+        let _ = ctx.buffer.write_all(&out);
+    });
+}
+
 fn take_quit_handlers() -> Vec<Box<dyn FnMut(&mut dyn Write)>> {
     with_ctx_mut(|ctx| {
         let mut out = Vec::new();
@@ -1029,12 +1039,7 @@ pub fn start_gui(
             .run_app(&mut handler)
             .map_err(|e| std::io::Error::other(e.to_string()))?;
         let code = try_with_gui_state(|s| s.exit_code).flatten().unwrap_or(0);
-        let mut handlers = take_quit_handlers();
-        with_ctx_mut(|ctx| {
-            for cb in handlers.iter_mut() {
-                cb(&mut ctx.buffer);
-            }
-        });
+        run_quit_handlers();
         Ok(code)
     })();
     let _ = with_ctx_mut(|ctx| ctx.disable());
@@ -1049,12 +1054,7 @@ fn run_terminal(root: &mut dyn Widget) -> std::io::Result<u8> {
                 RuntimeEvent::Quit(c) => Some(*c),
                 _ => None,
             }) {
-                let mut handlers = take_quit_handlers();
-                with_ctx_mut(|ctx| {
-                    for cb in handlers.iter_mut() {
-                        cb(&mut ctx.buffer);
-                    }
-                });
+                run_quit_handlers();
                 return Ok(code);
             }
             let timeout = update(root, &events)?;
