@@ -88,7 +88,16 @@ impl QueryBatch {
     pub fn execute(self) -> io::Result<QueryResults> {
         let mut reader = Reader::for_query()?;
 
-        let mut bytes: Vec<u8> = self.bytes.into_iter().flatten().collect();
+        let mut bytes: Vec<u8> = Vec::new();
+        for segment in self.bytes {
+            if segment.windows(2).any(|w| w == b"\x1b_") {
+                bytes.extend_from_slice(b"\x1b[22;2t");
+                bytes.extend(segment);
+                bytes.extend_from_slice(b"\x1b[23;2t");
+            } else {
+                bytes.extend(segment);
+            }
+        }
         bytes.extend_from_slice(b"\x1b[c");
         write_query(&bytes)?;
 
