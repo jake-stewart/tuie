@@ -163,6 +163,7 @@ pub mod prelude {
     pub use super::widget::input::InputQueue;
     pub use super::widget::input::InputResult;
 
+    pub use chord_macro::chord;
     pub use super::input::chord::Chord;
     pub use super::input::key::Key;
     pub use super::input::mouse::MouseButton;
