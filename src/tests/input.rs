@@ -132,6 +132,28 @@ fn popup_input_reports_terminal_cursor() {
 }
 
 #[test]
+fn id_survives_placeholder_toggle() {
+    let mut input_id = WidgetId::EMPTY;
+    let mut root = Pane::new().children([Input::new()
+        .placeholder(Text::new().content("Name"))
+        .id(&mut input_id)]);
+    let mut term = Emulator::new(&mut *root, Vec2::new(8, 1));
+
+    assert_eq!(
+        root.get_widget(input_id).map(Input::get_string),
+        Some(String::new()),
+    );
+
+    root.get_widget_mut(input_id).unwrap().set_content("hi");
+    term.update(&mut *root, &[]);
+
+    assert_eq!(
+        root.get_widget(input_id).map(Input::get_string),
+        Some("hi".to_string()),
+    );
+}
+
+#[test]
 fn ctrl_backspace_deletes_word() {
     let mut input = Input::new().content("hello world");
     let mut term = Emulator::new(&mut *input, Vec2::new(13, 1));
