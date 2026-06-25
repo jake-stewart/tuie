@@ -88,6 +88,10 @@ impl DelegateWidget for Input {
         &mut *self.text
     }
 
+    fn override_get_identity(&self) -> WidgetId {
+        self.text.get_id().untyped()
+    }
+
     fn override_is_focusable(&self) -> bool {
         true
     }

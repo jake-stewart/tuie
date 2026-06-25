@@ -862,6 +862,11 @@ pub trait DelegateWidget: 'static {
     /// Returns the inner delegate widget mutably.
     fn get_delegate_mut(&mut self) -> &mut dyn Widget;
 
+    /// Override hook for [`Widget::get_identity`].
+    fn override_get_identity(&self) -> WidgetId {
+        self.get_delegate().get_identity()
+    }
+
     /// Override hook for [`Widget::render`].
     fn override_render(&self, ctx: RenderContext) {
         self.get_delegate().render(ctx);
@@ -1079,6 +1084,10 @@ impl<T: DelegateWidget> Widget for T {
 
     fn get_layout_mut(&mut self) -> &mut Layout {
         self.get_delegate_mut().get_layout_mut()
+    }
+
+    fn get_identity(&self) -> WidgetId {
+        self.override_get_identity()
     }
 
     fn get_name(&self) -> &'static str {
@@ -1367,6 +1376,11 @@ pub trait Widget: std::any::Any {
     /// Returns the widget's [`Layout`] mutably.
     fn get_layout_mut(&mut self) -> &mut Layout;
 
+    /// Returns this widget's stable identity.
+    fn get_identity(&self) -> WidgetId {
+        WidgetId(self.get_layout().id, PhantomData)
+    }
+
     /// Returns the short type name.
     fn get_name(&self) -> &'static str {
         "Widget"
@@ -1547,7 +1561,7 @@ pub trait Widget: std::any::Any {
 pub trait WidgetMethods: Widget {
     /// Returns this widget's typed [`WidgetId`].
     fn get_id(&self) -> WidgetId<Self> {
-        WidgetId(self.get_layout().id, PhantomData)
+        WidgetId(self.get_identity().0, PhantomData)
     }
 
     /// Builder form of [`WidgetMethods::get_id`] that stores the id into `slot`.
