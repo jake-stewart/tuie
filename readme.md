@@ -1,6 +1,6 @@
 # tuie
 
-A rich, performant TUI library for Rust.
+A rich, performant TUI library for Rust. [Read the docs!](https://docs.rs/tuie/latest/tuie/)
 
 https://github.com/user-attachments/assets/ec1d8d8d-e476-4b78-8404-dd234d5a2ec7
 
